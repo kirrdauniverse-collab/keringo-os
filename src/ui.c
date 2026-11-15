@@ -1,6 +1,7 @@
 /* ui.c — Keringő asztal 0.2: 9 panel, használati gravitáció, kamera, HU/EN,
  * fájlkezelő, frissítés, böngésző, beállítások, ikontémák, háttérképek */
 #include "kernel.h"
+#include "wifi.h"
 #include "net.h"
 #include "icondata.h"
 
@@ -546,7 +547,8 @@ static void draw_panel_programok(texture_t *t, u32 tick) {
     }
     yy += 8;
     t_text(t, 14, yy, lang ? "Galaxy: F3 Paint F4 Text F7 Labirintus" : "Galaxisban: F3 Paint F4 Szöveg F7 Labirintus", C_MUTED); yy += 15;
-    t_text(t, 14, yy, lang ? "F9 Doom F10 Elite F11 City F12 Pinball" : "F9 Pokoljáró F10 Csillagvadász F11 Város F12 Flipper", C_MUTED);
+    t_text(t, 14, yy, lang ? "F9 Doom F10 Elite F11 City F12 Pinball" : "F9 Pokoljáró F10 Csillagvadász F11 Város F12 Flipper", C_MUTED); yy += 15;
+    t_text(t, 14, yy, lang ? "F6 Wi-Fi (WPA2 networks)" : "F6 Wi-Fi (WPA2 halozatok)", C_MUTED);
     t_text(t, 12, t->h - 22, HINT_PROG[lang], C_MUTED);
     (void)tick;
 }
@@ -978,8 +980,13 @@ void ui_task(void) {
             ui_handle_mouse(me.dx, me.dy, me.buttons);
         }
 
-        /* hálózati stream életben tartása + hang */
+        /* hálózati stream életben tartása + hang + Wi-Fi FSM */
         net_poll();
+        wifi_poll();
+        if (wifi_need_dhcp()) {
+            wifi_clear_need_dhcp();
+            net_dhcp();
+        }
         browser_stream_poll();
         sound_poll();
 

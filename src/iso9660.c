@@ -118,6 +118,7 @@ int iso_read_file(u32 lba, u32 size, char *buf, int bufsize, int *outlen) {
 
 int iso_find(const char *name, u32 *lba, u32 *size) {
     /* a gyorsítótárból keres — nincs újabb ATAPI olvasás */
+    if (cache_n < 0) iso_root_list(0, 0, 0, 0, 0);
     int n = cache_n;
     for (int i = 0; i < n; i++) {
         /* kis-nagybetű független összehasonlítás */

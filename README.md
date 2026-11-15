@@ -26,7 +26,7 @@ ignore drifts *outward*. The desktop rearranges itself around your habits.
 ## Quick start
 
 ```bash
-qemu-system-i386 -cdrom keringo-0.3.0.iso -boot d
+qemu-system-i386 -cdrom keringo-0.4.0.iso -boot d
 ```
 
 On real hardware: burn or Ventoy (legacy/CSM boot), or add to GRUB:

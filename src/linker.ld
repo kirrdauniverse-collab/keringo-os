@@ -18,7 +18,7 @@ SECTIONS
         *(.bss.stack)
     }
 
-    __kernel_end = ALIGN(4K);
+    __kernel_end = ALIGN(ADDR(.bss) + SIZEOF(.bss), 4K);
 
     /DISCARD/ : { *(.eh_frame) *(.note*) *(.comment) *(.interp) }
 }

@@ -160,7 +160,7 @@ int  vfs_read_any(const char *name, u8 *buf, u32 bufsize, u32 *outlen);
 #define KEY_END   0x96
 
 /* ---------- verzió ---------- */
-#define KERINGO_VERZIO "0.3.0"
+#define KERINGO_VERZIO "0.4.0"
 
 /* ---------- crc32 ---------- */
 u32 crc32_calc(u32 crc, const u8 *buf, u32 len);
@@ -435,6 +435,7 @@ void elite_enter(void); void elite_frame(u32 t); void elite_key(u8 sc, u8 rel, u
 void city_enter(void); void city_frame(u32 t); void city_key(u8 sc, u8 rel, u8 a); void city_mouse(int mx,int my,int dx,int dy,u8 btn,u8 prev); void city_exit(void);
 void pin_enter(void); void pin_frame(u32 t); void pin_key(u8 sc, u8 rel, u8 a); void pin_exit(void);
 void calc_enter(void); void calc_frame(u32 t); void calc_key(u8 sc, u8 rel, u8 a); void calc_mouse(int mx,int my,int dx,int dy,u8 btn,u8 prev);
+void wifiapp_enter(void); void wifiapp_frame(u32 t); void wifiapp_key(u8 sc, u8 rel, u8 a); void wifiapp_exit(void);
 
 
 

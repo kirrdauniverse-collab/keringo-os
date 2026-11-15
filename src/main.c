@@ -1,6 +1,8 @@
 /* main.c — Keringő OS 0.2 belépés: mag, tárolók, USB, hálózat, UI */
 #include "kernel.h"
 #include "net.h"
+#include "wifi.h"
+#include "crypto.h"
 
 u32 g_mbi_phys = 0;
 
@@ -73,6 +75,25 @@ void kmain(u32 magic, multiboot_info_t *mbi) {
 
     mem_init(mbi);
     kprintf("mem: KB=%d szabad lap=%d fb=%x\n", mem_total_kb(), mem_free_pages(), mem_fb_phys());
+
+    crypto_self_test();
+    wifi_init();
+    kprintf("wifi: alrendszer kesz\n");
+    /* CCMP terheléses önteszt sti után (336 bájtos DHCP-szerű keret, 50x) */
+    {
+        static u8 k[16], pt[336], ct[344], dt[336];
+        for (int i = 0; i < 16; i++) k[i] = (u8)(0x11 * (i + 1));
+        for (int i = 0; i < 336; i++) pt[i] = (u8)i;
+        u8 nonce[13]; for (int i = 0; i < 13; i++) nonce[i] = (u8)i;
+        u8 aad[16]; for (int i = 0; i < 16; i++) aad[i] = (u8)(0xa0 + i);
+        int ok = 1;
+        for (int c = 0; c < 50 && ok; c++) {
+            ccmp_encrypt(k, nonce, aad, 16, pt, 336, ct);
+            if (!ccmp_decrypt(k, nonce, aad, 16, ct, 344, dt)) ok = 0;
+            for (int i = 0; i < 336; i++) if (dt[i] != pt[i]) { ok = 0; break; }
+        }
+        kprintf("ccmp stressz: %s\n", ok ? "RENDBEN (50x336B)" : "HIBA");
+    }
 
     ps2_init();
     kprintf("ps2: billentyuzet+eger kezdemnyezve\n");

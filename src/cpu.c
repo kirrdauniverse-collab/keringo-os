@@ -19,8 +19,12 @@ void irq_install_handler(int irq, void (*h)(void)) { irq_handlers[irq] = h; }
 
 void isr_handler_c(regs_t *r) {
     if (r->int_no < 32) {
-        kprintf("KIVETEL %d err=%x eip=%x cs=%x esp=%x\n", r->int_no, r->err_code, r->eip, r->cs, r->esp);
-        kprintf("eax=%x ebx=%x ecx=%x edx=%x\n", r->eax, r->ebx, r->ecx, r->edx);
+        u32 cr2v;
+        __asm__ volatile("movl %%cr2,%0" : "=r"(cr2v));
+        kprintf("KIVETEL %d err=%x eip=%x cs=%x esp=%x cr2=%x\n",
+                r->int_no, r->err_code, r->eip, r->cs, r->esp, cr2v);
+        kprintf("eax=%x ebx=%x ecx=%x edx=%x esi=%x edi=%x\n",
+                r->eax, r->ebx, r->ecx, r->edx, r->esi, r->edi);
         for (;;) hlt();
     }
     if (r->int_no >= 32 && r->int_no < 48) {

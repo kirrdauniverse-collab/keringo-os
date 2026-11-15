@@ -13,12 +13,13 @@ const app_t app_list[] = {
     { {"Űrkadét Flipper",     "Space Cadet Pinball"}, pin_enter, pin_frame, pin_key,   0,            pin_exit,   0 },
     { {"Képernyővédők",       "Screensavers"},   savermenu_enter, savermenu_frame, savermenu_key, 0, 0, savermenu_esc },
     { {"Számológép",          "Calculator"},     calc_enter,   calc_frame,   calc_key,   calc_mouse,   0,          0 },
+    { {"Wi-Fi",               "Wi-Fi"},          wifiapp_enter, wifiapp_frame, wifiapp_key, 0,        wifiapp_exit, 0 },
 };
 const int APP_COUNT = sizeof(app_list) / sizeof(app_list[0]);
 
 /* gyorsindító billentyűk (galaxis nézetben) */
-const int app_hotkey_app[] = { 0, 1, 2, 3, 4, 5, 6 };
-const u8  app_hotkey_key[] = { KEY_F3, KEY_F4, KEY_F7, KEY_F9, KEY_F10, KEY_F11, KEY_F12 };
+const int app_hotkey_app[] = { 0, 1, 2, 3, 4, 5, 6, 9 };
+const u8  app_hotkey_key[] = { KEY_F3, KEY_F4, KEY_F7, KEY_F9, KEY_F10, KEY_F11, KEY_F12, KEY_F6 };
 const int APP_HOTKEYS = sizeof(app_hotkey_key);
 
 static int cur = -1;                 /* aktív alkalmazás sorszáma */

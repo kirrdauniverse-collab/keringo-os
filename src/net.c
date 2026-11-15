@@ -1,6 +1,7 @@
 /* net.c — hálózati mag: eszközkeresés, ARP, IPv4, ICMP, UDP, DHCP, DNS */
 #include "kernel.h"
 #include "net.h"
+#include "wifi.h"
 
 netdev_t *net_dev = 0;
 static int hw_ready = 0;
@@ -61,7 +62,12 @@ int net_ip_parse(const char *s, u32 *out) {
 int net_hw_ready(void) { return hw_ready; }
 int net_up(void) { return net_dev && net_dev->ip_ok; }
 u32 net_self_ip(void) { return net_dev ? net_dev->ip : 0; }
-const char *net_chipname(void) { return net_dev ? (net_dev->type == 1 ? "e1000" : "rtl8139") : "-"; }
+const char *net_chipname(void) {
+    if (!net_dev) return "-";
+    if (net_dev->type == 1) return "e1000";
+    if (net_dev->type == 2) return "rtl8139";
+    return "wifi";
+}
 
 /* ---------------- keretküldés ---------------- */
 int net_send_raw(const u8 *pkt, u32 len) {
@@ -218,7 +224,8 @@ static void dhcp_send(u8 msgtype, u32 requested_ip, u32 server_id) {
     put_be32(d + 4, 0x4B45524E);             /* xid = 'KERN' */
     put_be16(d + 10, 0x8000);                /* broadcast flag */
     for (int i = 0; i < 6; i++) d[28 + i] = net_dev->mac[i];
-    put_be32(d + 236, DHCP_MAGIC);
+    /* DHCP mágus WIRE sorrendben: 63 82 53 63 (a LE-olvasás 0x63538263) */
+    d[236] = 0x63; d[237] = 0x82; d[238] = 0x53; d[239] = 0x63;
     /* 53: üzenettípus */
     d[240] = 53; d[241] = 1; d[242] = msgtype;
     /* 61: kliensazonosító */
@@ -420,5 +427,16 @@ void net_init_hw(void) {
         n++;
         if (n > 8) break;
     }
-    kprintf("net: nincs ismert halokartya\n");
+    /* Wi-Fi: Atheros AR9285 (osztály 02/80) */
+    n = 0;
+    while (pci_scan_class(&pc, 0x02, 0x80, n)) {
+        u16 vid = PCI_VENID(pc);
+        u16 did = PCI_DEVID(pc);
+        if (vid == 0x168C && did == 0x002B) {
+            if (ath9k_add_controller(pc)) { hw_ready = 1; break; }
+        }
+        n++;
+        if (n > 8) break;
+    }
+    if (!hw_ready) kprintf("net: nincs ismert halokartya\n");
 }

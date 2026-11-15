@@ -16,13 +16,13 @@
 
 .section .bss.stack, "aw", @nobits
 .align 16
-    .comm kstack, 16384
+    .comm kstack, 49152
 
 .section .text
 .global _start
 .type _start, @function
 _start:
-    movl $kstack + 16384, %esp
+    movl $kstack + 49152, %esp
     pushl %ebx                         /* multiboot_info*  */
     pushl %eax                         /* mágia (0x2BADB002) */
     call kmain

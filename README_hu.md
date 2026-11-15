@@ -1,4 +1,4 @@
-# Keringő OS 0.3.0 — „Játéktér"
+# Keringő OS 0.4.0 — „Wi-Fi"
 
 **Saját kernel. Saját grafika. Saját ötlet.** Nem Linux, nem fork — nulláról
 írt, csupasz fém i386 operációs rendszer, magyar identitással.
@@ -16,6 +16,7 @@ Az asztal magától átrendeződik a szokásaid szerint — ilyet még nem láto
 |---|---|
 | Kernel | GDT/IDT, PIC remap, PIT 100 Hz, **preemptív többfeladat** (round-robin, IRQ0), 4 KB-os lapozás + MMIO-térképezés, bump-heap, **PC-hangszóró** (PIT 2. csatorna) |
 | Eszközök | PS/2 billentyűzet + **egér (javított sorkezeléssel!)**, ATAPI CD, ATA merevlemez, **USB pendrájv (UHCI/EHCI, FAT32 olvasás+írás)**, **PCI**, **hálózat: e1000/RTL8139 + DHCP/TCP/UDP/DNS/HTTP** |
+| **Wi-Fi (0.4)** | **Atheros AR9285 (PCIe) meghajtó** — 2.4 GHz, HT20, legacy sebességek; **802.11g STA** (szken, auth/assoc); **WPA2-PSK**: PBKDF2-SHA1 PMK, PRF PTK, 4-way EAPOL, **CCMP** (saját SHA1/HMAC/AES); **Wi-Fi panel (F6)**; QEMU-hoz **demo rádió** (virtuális AP-k valódi kriptóval) |
 | Fájlrendszer | ISO9660 (`/cd`), RAMFS (`/mem`), **FAT32** (`/sys` HDD-n, `/usb` pendrájvon), partíció-szkenner (MBR + logikai lánc) |
 | Grafika | VBE lineáris framebuffer (a gép által felajánlott módban, pl. 1024×768 vagy 1280×800×32), dupla puffer, saját 8×8 font **magyar ékezetekkel** (ő ű ű Ű kézi bitkép), saját 3D vetítő, textúrázott keringő panelek, **raycaster** (texturált falak + sprite-billboardok) |
 | Felület | 10 keringő panel: Mag, Óra, Feladatok, Jegyzet, Lemez, Róla, Frissítés, Böngésző, Beállítás, **Programok** (alkalmazásindító) — HU/EN (F1) |
@@ -27,6 +28,7 @@ Az asztal magától átrendeződik a szokásaid szerint — ilyet még nem láto
 
 | Program | Mit tud | Indítás |
 |---|---|---|
+| **Wi-Fi** | hálózatkeresés (1/6/11), jelerősség, WPA2 jelszó, állapot + IP; csatlakozás után a böngésző és minden hálózati funkció Wi-Fi-n megy | `F6` vagy 0 |
 | **Festő** | ceruza, vonal, téglalap, teli téglalap, ellipszis, szóró, radír, **töltés**; 24 szín, ecsetméret, visszavonás, **BMP mentés** a `/sys`-re | `F3` vagy 1 |
 | **Szövegszerkesztő** | UTF-8, **magyar ékezetes gépelés** (ő=[-hely, é=;-hely, AltGr+O=ó…), kurzor, görgetés, fájlmegnyitás minden tárolóról, mentés `/sys`+`/mem` | `F4` vagy 2 |
 | **Labirintus 3D** | Wolfenstein-hommage raycaster: texturált falak, **minimap**, találd meg a zöld portált | `F7` vagy 3 |
@@ -49,7 +51,7 @@ programokat; az appokban `Esc` = vissza az asztalra.
 | `Tab` | következő panel; `Enter` = belépés; `Esc` = vissza |
 | `F1` | magyar ⇄ angol |
 | `1`–`9` (galaxisban) | program indítása |
-| `F3 F4 F7 F9 F10 F11 F12` | Festő, Szöveg, Labirintus, Pokoljáró, Csillagvadász, Város, Flipper |
+| `F3 F4 F6 F7 F9 F10 F11 F12` | Festő, Szöveg, Wi-Fi, Labirintus, Pokoljáró, Csillagvadász, Város, Flipper |
 | `F2` | Jegyzet mentése / Paint BMP mentése / Szöveg mentése |
 | `F5` | Böngésző újratöltés; Lemez-panel frissítés |
 | `F8` | Beállítások mentése |
@@ -64,6 +66,17 @@ qemu-system-i386 -cdrom keringo-0.3.0.iso -boot d
 ### Valódi gépen (Ventoy)
 Az ISO-t tedd Ventoy stickre, bootolj **legacy/CSM** módból
 (ASUS X551MA: Secure Boot KI, Launch CSM BE).
+
+### Wi-Fi valódi gépen
+Az ISO `KERINGO.CFG`-jében alapból `wifi_demo=1` áll (QEMU-teszthez).
+Valódi kártya esetén **nem kell törölni**: ha a rendszer Atheros AR9285-öt
+talál (0x168C:0x002B), a demo automatikusan kikapcsol és a valódi rádióvesz.
+- Támogatott: **AR9285** (az X551MA tipikus kártyája), 2.4 GHz, WPA2-PSK
+  (CCMP) és nyílt hálózat. A CCMP titkosítás szoftveres.
+- **Mezőn letesztendő**: az RF-kezdeményezés (reset/ini/kalibráció) a Linux
+  ath9k sorozatait követi, de valódi hardveren még nem futott — ha nem
+  talál hálózatot, soros kimeneten `ath9k:` üzenetek jelzik a fázist.
+- Nem támogatott (0.5 terv): AR9485/AR9003-útvonal, 802.11n, WPA3.
 
 ### GRUB-menübe a többi rendszer mellé
 ```bash
@@ -107,7 +120,9 @@ ezért az ISO-t `--sort-weight`-tel úgy építjük, hogy a boot-kép a lemez
 
 ## Útiterv (0.4+)
 
+- Wi-Fi: AR9485/AR9003 meghajtó-útvonal, 802.11n (HT20/40), TX-erő az
+  EEPROM-pdadc táblákból, rate adaptation, ath9k mezőn-teszt visszajelzések
 - teljesítmény: rostázott (clipped) textúrarajzolás, soronkénti gyorsított másolás
-- Festő:Betöltés BMP-ből; Szöveg: keresés, mozgó blokk
+- Festő: Betöltés BMP-ből; Szöveg: keresés, mozgó blokk
 - játékok: Hangok (PC speaker zene), Pokoljáró: két pálya + főnök
 - hálózat: TFTP-s kernelszinkron, időszinkron (SNTP)

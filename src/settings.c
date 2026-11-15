@@ -1,6 +1,7 @@
 /* settings.c — beállítások: háttérkép, ikontéma, kiemelőszín, nyelv, frissítési URL.
  * KERINGO.CFG: "kulcs=ertek" sorok; betöltés /sys, /usb, /cd közül. */
 #include "kernel.h"
+#include "wifi.h"
 
 static int kstreq(const char *a, const char *b);
 
@@ -86,6 +87,10 @@ void settings_load(void) {
                 int j;
                 for (j = 0; j < 63 && val[j]; j++) settings.wp_file[j] = val[j];
                 settings.wp_file[j] = 0;
+            }
+            else if (kstreq(key, "wifi_demo") && parse_int(val)) {
+                wifi_demo_enable();
+                kprintf("wifi: DEMO radio aktiv (QEMU teszt)\n");
             }
         }
         *eol = save;
