@@ -1,0 +1,5 @@
+Keringo OS 0.1.0
+================
+
+Ez a rendszer sajat boot CD-rol olvassa be ezt a fajlt!
+A keringes megkezdodott.

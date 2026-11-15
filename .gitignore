@@ -1,0 +1,8 @@
+# Fordítási termékek
+src/build/
+src/kernel.elf
+src/*.iso
+*.o
+*.img
+*.qcow2
+__pycache__/
