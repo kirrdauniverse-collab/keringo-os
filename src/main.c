@@ -1,63 +1,69 @@
-/* main.c — Keringő OS belépés */
+/* main.c — Keringő OS 0.2 belépés: mag, tárolók, USB, hálózat, UI */
 #include "kernel.h"
+#include "net.h"
 
-/* háttér-pulzus: soros log 1 s-enként */
+u32 g_mbi_phys = 0;
+
+/* háttér-pulzus: soros log 5 s-enként */
 static void pulzus_task(void) {
     u32 last = 0;
     for (;;) {
         u32 t = tick_count();
-        if (t - last >= 100) {
+        if (t - last >= 500) {
             last = t;
-            kprintf("pulzus: %d s\n", t / 100);
+            kprintf("pulzus: %u s | halozat=%d usb=%d sys=%d\n",
+                    t / 100, net_up(), usb_ready(), sys_mounted());
         }
         task_yield();
     }
 }
 
-/* háttér: CD meghajtó + ISO9660 felcsatolás */
+/* háttér: tárolók felállítása (CD, USB pendrájv, ATA merevlemez, /sys) */
 static void lemez_task(void) {
-    char names[16][64]; u32 sizes[16]; u8 flags[16];
-    for (;;) {
-        if (ata_init() && iso_mount()) {
-            u32 lbas[16];
-            int cd = iso_root_list(names, lbas, sizes, flags, 16);
-            ui_fs_set_cd(cd, names, sizes);
-            /* az /cd fájljainak előreolvasása RAM-ba (a CD a saját boot-lemezünk) */
-            {
-                static char fbuf[2048];
-                int flen = 0;
-                for (int k = 0; k < cd && k < 16; k++) {
-                    if (sizes[k] == 0 || sizes[k] > 2048) continue;
-                    if (flags[k] & 1) continue;              /* könyvtár */
-                    int ok = 0; flen = 0;
-                    for (int att = 0; att < 6 && !ok; att++) {
-                        ok = iso_read_file(lbas[k], sizes[k], fbuf, 2048, &flen) && flen > 0 && fbuf[0] != 0;
-                    }
-                    kprintf("[preload] %s lba=%d ok=%d flen=%d b0=%x\n",
-                            names[k], lbas[k], ok, flen, (u8)fbuf[0]);
-                    if (ok) ui_cd_cache(k, fbuf, flen);
-                }
-                kprintf("lemez: %d fajl eloreolvasva\n", cd);
-            }
-            int mem = vfs_list("/mem", names, sizes, flags, 16);
-            ui_fs_set_mem(mem, names, sizes);
-            kprintf("lemez: kesz, cd=%d mem=%d\n", cd, mem);
-            /* innentől pihenő — a CD-tartalom nem változik */
-            for (;;) task_yield();
-        }
-        /* újrapróbálkozás kb. 1 másodperc múlva */
-        u32 until = tick_count() + 100;
-        while (tick_count() < until) task_yield();
+    /* 1. CD (a boot-lemez) */
+    if (ata_init() && iso_mount()) {
+        kprintf("lemez: CD rendben\n");
     }
+    /* 2. USB vezérlők + pendrájv */
+    usb_init();
+    /* 3. ATA merevlemezek */
+    ata_disk_scan();
+    /* 4. fájlrendszerek felcsatolása */
+    vfs_mount_all();
+    /* 5. beállítások betöltése (KERINGO.CFG) + alkalmazás */
+    settings_load();
+    ui_settings_reloaded();
+    ui_fs_announce();
+    /* 6. frissítési csomag keresése a pendrájvon */
+    update_scan_usb();
+    if (update_available_newer())
+        kprintf("lemez: UJ FRISSITES ELÉRHETŐ: %s\n", update_version());
+    storage_boot_done();
+    kprintf("lemez: minden kesz\n");
+    for (;;) task_yield();
+}
+
+/* háttér: hálózati kártya + DHCP (a UI felé zárással) */
+static void halozat_task(void) {
+    net_lock_all();
+    net_init_hw();
+    if (net_dev) {
+        kprintf("halozat: kartya: %s\n", net_chipname());
+        net_dhcp();
+    }
+    net_unlock_all();
+    kprintf("halozat: kesz (up=%d)\n", net_up());
+    for (;;) task_yield();
 }
 
 void kmain(u32 magic, multiboot_info_t *mbi) {
     serial_init();
-    kprintf("\n=== KERINGO OS 0.1.0 boot ===\n");
+    kprintf("\n=== KERINGO OS %s boot ===\n", KERINGO_VERZIO);
     if (magic != 0x2BADB002) {
         kprintf("HIBA: multiboot magic rossz: %x\n", magic);
         for (;;) hlt();
     }
+    g_mbi_phys = (u32)mbi;
     if (!(mbi->flags & MBI_FLAG_FRAMEBUFFER) || mbi->framebuffer_bpp > 64) {
         kprintf("FIGY: nincs hasznalhato framebuffer-info\n");
     }
@@ -74,11 +80,12 @@ void kmain(u32 magic, multiboot_info_t *mbi) {
     gfx_init(mbi);
     r3d_init();
     ui_init();
-    kprintf("ui: keringo asztal kesz\n");
+    kprintf("ui: keringo asztal kesz (9 panel)\n");
 
     task_init();
     task_spawn("pulzus", pulzus_task, 0);
     task_spawn("lemez", lemez_task, 0);
+    task_spawn("halozat", halozat_task, 0);
     kprintf("task: %d db indulra kesz\n", task_count());
 
     sti();

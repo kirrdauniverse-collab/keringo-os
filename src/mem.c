@@ -101,11 +101,18 @@ void mem_init(multiboot_info_t *mbi) {
     }
     if (mbi->flags & MBI_FLAG_FRAMEBUFFER) {
         fb_phys = (u32)(mbi->framebuffer_addr & 0xFFFFFFFF);
-        u32 *ptfb = (u32 *)kmalloc(1024 * 4);
+        u32 fbsz = mbi->framebuffer_pitch * mbi->framebuffer_height;
+        u32 npages = (fbsz + 0xFFF) >> 12;
+        if (npages < 1) npages = 1;
+        if (npages > 2048) npages = 2048;
+        u32 *ptfb = (u32 *)kmalloc(2048 * 4);
         u32 fb_base = fb_phys & 0xFFFFF000;
-        for (u32 i = 0; i < 1024; i++) ptfb[i] = (fb_base + i * 0x1000) | 0x03;
-        pgdir[512] = ((u32)ptfb & 0xFFFFF000) | 0x03;   /* virtuális 0x80000000 */
-        kprintf("mem: fb atva: virt=%x fiz=%x\n", 512u * 0x400000u, fb_base);
+        for (u32 i = 0; i < npages; i++) ptfb[i] = (fb_base + i * 0x1000) | 0x03;
+        for (u32 i = npages; i < 2048; i++) ptfb[i] = 0;
+        pgdir[512] = ((u32)ptfb & 0xFFFFF000) | 0x03;          /* virtuális 0x80000000 */
+        pgdir[513] = ((u32)ptfb & 0xFFFFF000) | 0x03;          /* + 4 MB (közös PT) */
+        kprintf("mem: fb atva: virt=%x fiz=%x meret=%u lap=%u\n",
+                512u * 0x400000u, fb_base, fbsz, npages);
     }
 
     kprintf("mem5 tablak kesz\n");
@@ -113,6 +120,30 @@ void mem_init(multiboot_info_t *mbi) {
     u32 cr0; __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
     __asm__ volatile("mov %0, %%cr0" :: "r"(cr0 | 0x80000000)); /* PG */
     kprintf("mem6 PG bekapcsolva\n");
+}
+
+static u32 mmio_pde_next = 576;           /* 0x90000000-tól felfelé */
+
+/* PCI MMIO terület leképezése a virtuális térbe (PCD-vel: nincs gyorsítótár) */
+void *mem_map_mmio(u32 phys, u32 size) {
+    if (mmio_pde_next >= 1024) return 0;
+    /* a laptábla 4 KB-igazított kell legyen: 8 KB-ot foglalunk és igazítunk */
+    u8 *raw = (u8 *)kmalloc(8192);
+    if (!raw) return 0;
+    u32 *pt = (u32 *)(((u32)raw + 4095) & ~4095u);
+    u32 base = phys & 0xFFFFF000u;
+    u32 npages = (size + (phys - base) + 0xFFF) >> 12;
+    if (npages > 1024) npages = 1024;
+    for (u32 i = 0; i < 1024; i++)
+        pt[i] = (i < npages) ? ((base + i * 4096) | 0x13) : 0;   /* P|RW|PCD */
+    pgdir[mmio_pde_next] = ((u32)pt & 0xFFFFF000) | 0x03;
+    u32 vaddr = mmio_pde_next * 0x400000 + (phys - base);
+    u32 idx = mmio_pde_next;
+    mmio_pde_next++;
+    __asm__ volatile("invlpg (%0)" :: "r"(vaddr) : "memory");
+    kprintf("mem: mmio lekerpezve %x -> %x (%u lap) pde=%x\n",
+            phys, vaddr, npages, pgdir[idx]);
+    return (void *)vaddr;
 }
 
 u32 mem_total_kb(void) { return ram_top / 1024; }

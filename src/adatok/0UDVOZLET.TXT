@@ -1,5 +1,16 @@
-Keringo OS 0.1.0
-================
+KERINGO OS 0.2.0 - Udvozoljuk a keringo asztalon!
 
-Ez a rendszer sajat boot CD-rol olvassa be ezt a fajlt!
+A panelek parabolapalyan keringenek a rendszer magja korul.
+Am gyakrabban hasznalsz egy panelt, annal kozelebb kering.
+
+0.2 UJDONSAGOK:
+- Pendrajv (FAT32) olvasasa ES irasa
+- Frissites KERINGO.UPD csomagbol (pendrajvrol vagy halozatrol)
+- Elore frissites ujrainditas nelkul (kexec)
+- Bongeszo: egyszeru HTTP + MJPEG elo video
+- Hatterkep, ikontemak, kiemeloszin
+- DHCP, DNS, TCP/IP sajat implementacioval
+- JPEG es BMP dekodolo
+
+A lemez tartalma a /cd tarolo. Sajat kernelen fut!
 A keringes megkezdodott.

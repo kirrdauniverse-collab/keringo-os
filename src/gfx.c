@@ -16,6 +16,7 @@ void gfx_init(multiboot_info_t *mbi) {
     kprintf("gfx: %dx%d pitch=%d buffer=%x\n", fb_w, fb_h, fb_pitch, (u32)back);
 }
 
+u32 *gfx_backbuf(void) { return back; }
 u32 gfx_width(void)  { return fb_w; }
 u32 gfx_height(void) { return fb_h; }
 
