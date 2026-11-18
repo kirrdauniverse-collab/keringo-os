@@ -35,7 +35,7 @@ static void store(char *s){
     for(int a=i;a>0;a--){int x=0,y=0;while(lines[a][x]>='0'&&lines[a][x]<='9')x++;while(lines[a-1][y]>='0'&&lines[a-1][y]<='9')y++;int na=0,nb=0;for(int z=0;z<x;z++)na=na*10+lines[a][z]-'0';for(int z=0;z<y;z++)nb=nb*10+lines[a-1][z]-'0';if(na>=nb)break;for(int z=0;z<LL;z++){char c=lines[a][z];lines[a][z]=lines[a-1][z];lines[a-1][z]=c;}}
 }
 static void runline(const char *s,int *pc){
-    while(*s==' ')(*s)++;
+    while(*s>='0'&&*s<='9')s++; while(*s==' ')s++;
     if(!*s)return;
     if(s[0]=='P'&&s[1]=='R'&&s[2]=='I'&&s[3]=='N'&&s[4]=='T'){
         s+=5;while(*s==' ')s++;
