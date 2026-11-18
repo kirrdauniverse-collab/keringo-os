@@ -14,11 +14,13 @@ const app_t app_list[] = {
     { {"Képernyővédők",       "Screensavers"},   savermenu_enter, savermenu_frame, savermenu_key, 0, 0, savermenu_esc },
     { {"Számológép",          "Calculator"},     calc_enter,   calc_frame,   calc_key,   calc_mouse,   0,          0 },
     { {"Wi-Fi",               "Wi-Fi"},          wifiapp_enter, wifiapp_frame, wifiapp_key, 0,        wifiapp_exit, 0 },
+
     { {"Keringő BASIC",       "Keringo BASIC"}, basic_enter, basic_frame, basic_key, 0, basic_exit, 0 },
     { {"KIRRDA AI",            "KIRRDA AI"},      kirrda_enter, kirrda_frame, kirrda_key, 0, kirrda_exit, 0 },
     { {"Obszervatórium",       "Observatory"},    obs_enter, obs_frame, obs_key, 0, obs_exit, 0 },
     { {"Keringő Lab",          "Keringo Lab"},    lab_enter, lab_frame, lab_key, 0, lab_exit, 0 },
     { {"Orbit Miner",           "Orbit Miner"},    miner_enter, miner_frame, miner_key, 0, miner_exit, 0 },
+    { {"ZX81 Retro",          "ZX81 Retro"},       zx81_app_enter, zx81_app_frame, zx81_app_key, 0, zx81_app_exit, 0 },
 };
 const int APP_COUNT = sizeof(app_list) / sizeof(app_list[0]);
 
