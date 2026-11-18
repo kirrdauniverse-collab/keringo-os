@@ -126,3 +126,10 @@ ezért az ISO-t `--sort-weight`-tel úgy építjük, hogy a boot-kép a lemez
 - Festő: Betöltés BMP-ből; Szöveg: keresés, mozgó blokk
 - játékok: Hangok (PC speaker zene), Pokoljáró: két pálya + főnök
 - hálózat: TFTP-s kernelszinkron, időszinkron (SNTP)
+
+
+## Keringő Mega Pack
+
+A fejlesztői ág új natív alkalmazásokat tartalmaz: **Keringő BASIC**, **KIRRDA** lokális szabályalapú asszisztens, **Keringő Observatory**, **Keringő Lab** és **Orbit Miner**. Ezek a meglévő app-keretrendszert és a framebufferes grafikai API-t használják, külső függőségek nélkül.
+
+A meglévő **Pokoljáró** a beépített DOOM-hommage raycaster. A következő portfázis célja egy külön, valódi WAD/IWAD-alapú DOOM futtatóréteg, amelyhez a játékadatok nem kerülnek a repóba.
