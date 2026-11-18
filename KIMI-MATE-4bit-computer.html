@@ -1,1 +1,1384 @@
 
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUARTZ-4B 500Hz - FIXED INPUT</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #1a1a1a;
+            color: #33ff33;
+            font-family: 'VT323', monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .tv-container {
+            width: 900px;
+            max-width: 95vw;
+            margin-top: 20px;
+        }
+        
+        .tv-cabinet {
+            background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        }
+        
+        .tv-brand {
+            text-align: center;
+            color: #666;
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .screen-bezel {
+            background: #2a2a2a;
+            border-radius: 30px;
+            padding: 25px;
+            position: relative;
+        }
+        
+        .crt-container {
+            background: #000;
+            border-radius: 60px;
+            padding: 8px;
+            overflow: hidden;
+        }
+        
+        .crt-screen {
+            width: 640px;
+            height: 480px;
+            background: #0a0a0a;
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            cursor: text;
+        }
+        
+        .phosphor-glow {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, rgba(51,255,51,0.1) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 11;
+        }
+        
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2) 1px, transparent 1px, transparent 3px);
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .screen-curve {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50px;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 12;
+        }
+        
+        #display-canvas {
+            width: 100%; height: 100%;
+            image-rendering: pixelated;
+        }
+        
+        .power-indicator {
+            position: absolute;
+            bottom: 15px; left: 25px;
+            display: flex; align-items: center; gap: 8px;
+            color: #666; font-size: 0.7rem;
+        }
+        
+        .power-led {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #33ff33;
+            box-shadow: 0 0 10px #33ff33;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .tv-controls {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-label {
+            color: #666;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+        }
+        
+        .channel-knob, .pot {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #333, #111);
+            border: 3px solid #222;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .pot { width: 50px; height: 50px; }
+        
+        .channel-knob::before, .pot::before {
+            content: '';
+            position: absolute;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            width: 4px; height: 15px;
+            background: #33ff33;
+            border-radius: 2px;
+        }
+        
+        .pot::before { width: 3px; height: 12px; background: #666; }
+        
+        .toggle-panels {
+            position: fixed;
+            top: 20px; right: 20px;
+            background: #222;
+            border: 1px solid #444;
+            color: #666;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: 'VT323', monospace;
+            z-index: 100;
+        }
+        
+        .toggle-panels:hover { color: #33ff33; border-color: #33ff33; }
+        
+        .panels-container {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 900px;
+            max-width: 95vw;
+            margin-top: 30px;
+        }
+        
+        .panels-container.visible { display: grid; }
+        
+        .panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            color: #33ff33;
+        }
+        
+        .panel-title {
+            color: #666;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .editor-textarea {
+            width: 100%;
+            min-height: 150px;
+            background: #0a0a0a;
+            border: 1px solid #222;
+            color: #33ff33;
+            font-family: 'VT323', monospace;
+            font-size: 1.1rem;
+            padding: 10px;
+            resize: vertical;
+        }
+        
+        .btn {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #666;
+            padding: 8px 15px;
+            margin: 5px 5px 0 0;
+            cursor: pointer;
+            font-family: 'VT323', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .btn:hover { border-color: #33ff33; color: #33ff33; }
+        .btn.primary { border-color: #2a5a2a; color: #3f3; }
+        .btn.danger { border-color: #5a2a2a; color: #f33; }
+        
+        .keyboard-section {
+            display: none;
+            margin-top: 20px;
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .keyboard-section.visible { display: block; }
+        
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(14, 1fr);
+            gap: 4px;
+        }
+        
+        .key {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px 4px;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            font-size: 0.8rem;
+            color: #666;
+            min-height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .key:hover { border-color: #33ff33; color: #33ff33; }
+        .key:active { background: #33ff33; color: #000; transform: translateY(2px); }
+        .key.wide { grid-column: span 2; }
+        .key.space { grid-column: span 6; }
+        
+        .hidden { display: none !important; }
+        
+        /* Prevent focus outline */
+        *:focus { outline: none; }
+        
+        .help-text {
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #666;
+        }
+        
+        .help-text h3 {
+            color: #33ff33;
+            margin: 10px 0 5px 0;
+        }
+        
+        /* Status indicator */
+        .input-mode {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: #33ff33;
+            font-size: 0.7rem;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .input-mode.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <button class="toggle-panels" onclick="togglePanels()">⚙️ PANELS</button>
+    
+    <div class="tv-container">
+        <div class="tv-cabinet">
+            <div class="tv-brand">⚡ QUARTZ-4B 500Hz 4-BIT ⚡</div>
+            <div class="screen-bezel">
+                <div class="crt-container">
+                    <div class="crt-screen" id="crt-screen">
+                        <canvas id="display-canvas" width="320" height="240"></canvas>
+                        <div class="scanlines"></div>
+                        <div class="phosphor-glow"></div>
+                        <div class="screen-curve"></div>
+                        <div class="input-mode" id="input-indicator">● INPUT</div>
+                    </div>
+                </div>
+                <div class="power-indicator">
+                    <div class="power-led"></div>
+                    <span>POWER</span>
+                </div>
+            </div>
+            <div class="tv-controls">
+                <div class="control-group">
+                    <div class="control-label">Channel</div>
+                    <div class="channel-knob" onclick="computer.beep()"></div>
+                </div>
+                <div class="control-group">
+                    <div class="control-label">Focus</div>
+                    <div class="pot" onclick="computer.beep()"></div>
+                </div>
+                <div class="control-group">
+                    <div class="control-label">Intensity</div>
+                    <div class="pot" onclick="adjustBrightness()"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="panels-container" id="panels">
+        <div class="panel">
+            <div class="panel-title">BASIC EDITOR (Copy & Paste here)</div>
+            <textarea class="editor-textarea" id="editor" placeholder="10 PRINT &quot;HELLO&quot;&#10;20 GOTO 10&#10;&#10;Then click LOAD TO SCREEN"></textarea>
+            <div style="margin-top: 10px;">
+                <button class="btn primary" onclick="loadFromEditor()">LOAD TO SCREEN</button>
+                <button class="btn" onclick="clearEditor()">CLEAR</button>
+                <button class="btn" onclick="saveFile()">SAVE TO FILE</button>
+            </div>
+            <div class="panel-title" style="margin-top: 15px;">FILES</div>
+            <div id="file-list" style="font-size: 0.9rem; color: #666;">No files</div>
+        </div>
+        
+        <div class="panel">
+            <div class="panel-title">4-BIT CPU / MACHINE CODE</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1rem; margin-bottom: 15px;">
+                <div>PC: <span id="reg-pc" style="color: #3f3;">000</span></div>
+                <div>A: <span id="reg-a" style="color: #3f3;">0</span></div>
+                <div>X: <span id="reg-x" style="color: #3f3;">000</span></div>
+                <div>SP: <span id="reg-sp" style="color: #3f3;">FF0</span></div>
+            </div>
+            <div style="margin-bottom: 10px; color: #666; font-size: 0.8rem;">
+                FLAGS: <span id="reg-f">----</span>
+            </div>
+            
+            <div class="panel-title">CONTROLS</div>
+            <button class="btn primary" onclick="computer.runBASIC()">RUN PROGRAM</button>
+            <button class="btn" onclick="computer.pause()">STOP</button>
+            <button class="btn danger" onclick="computer.reset()">RESET</button>
+            <button class="btn" onclick="toggleKeyboard()">VIRTUAL KEYBOARD</button>
+            
+            <div class="panel-title" style="margin-top: 15px;">MACHINE CODE ($000)</div>
+            <textarea class="editor-textarea" id="machine-editor" style="min-height: 60px; font-size: 0.9rem;" placeholder="12 23 34 F0..."></textarea>
+            <button class="btn" onclick="loadMachineCode()" style="margin-top: 5px;">LOAD HEX TO RAM</button>
+            
+            <div class="panel-title" style="margin-top: 15px;">PROGRAM IN MEMORY</div>
+            <div id="program-view" style="font-size: 0.85rem; color: #666; max-height: 80px; overflow-y: auto;">Empty</div>
+        </div>
+    </div>
+    
+    <div class="keyboard-section" id="keyboard-section" style="width: 900px; max-width: 95vw;">
+        <div class="panel-title">VIRTUAL KEYBOARD</div>
+        <div class="keyboard" id="virtual-keyboard"></div>
+    </div>
+    
+    <div class="panel" style="width: 900px; max-width: 95vw; margin-top: 20px;">
+        <div class="panel-title">QUARTZ-4B v3.0 - COMMAND REFERENCE</div>
+        <div class="help-text">
+            <h3>📺 DISPLAY</h3>
+            MODE 0 (Text 32x16) | MODE 1 (Graphics 64x48)<br>
+            PRINT "text" | PRINT @x,y "text" | CLS<br>
+            
+            <h3>🎨 GRAPHICS</h3>
+            PLOT x,y | UNPLOT x,y | POINT(x,y)<br>
+            LINE x1,y1,x2,y2 | DRAWTO x,y | BOX x1,y1,x2,y2<br>
+            CIRCLE x,y,r | TRIANGLE x1,y1,x2,y2,x3,y3<br>
+            FILL x,y - Flood fill enclosed area<br>
+            
+            <h3>🔢 VARIABLES (4-bit: 0-15)</h3>
+            A=5 or LET A=5 | INC A | DEC A<br>
+            
+            <h3>🔄 CONTROL</h3>
+            GOTO n | GOSUB n / RETURN | IF cond THEN ...<br>
+            FOR A=1 TO 10 [STEP n] / NEXT A<br>
+            WHILE cond / WEND | REPEAT / UNTIL cond<br>
+            
+            <h3>💾 MEMORY & SYSTEM</h3>
+            PEEK(addr) | POKE addr,value | SYS addr | CALL addr<br>
+            WAIT n | BEEP | RND(n)<br>
+            
+            <h3>💿 FILES</h3>
+            SAVE "name" | LOAD "name" | FILES | DELETE "name" | NEW<br>
+            
+            <h3>⚡ 4-BIT MACHINE CODE</h3>
+            1n LDA n | 2n ADD n | 3n SUB n | 4n STA @X+n<br>
+            5n JMP @X+n | 6n JZ @X+n | 7n JC @X+n<br>
+            8n LDX n | 9n INX | An DEX | Bn JSR @X+n<br>
+            Cn RTS | Dn OUT | En IN | Fn HLT
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // QUARTZ-4B AUTHENTIC 4-BIT SYSTEM v3.0
+        // FIXED INPUT HANDLING
+        // ==========================================
+        
+        class Quartz4B {
+            constructor() {
+                // 4-BIT CPU
+                this.pc = 0;
+                this.a = 0;
+                this.b = 0;
+                this.x = 0;
+                this.sp = 0xFF0;
+                this.ir = 0;
+                this.flags = { z: 0, n: 0, c: 0, v: 0 };
+                
+                // 4KB MEMORY
+                this.ram = new Uint8Array(4096);
+                
+                // VIDEO
+                this.videoMode = 0;
+                this.vramText = new Uint8Array(512);
+                this.vramGfx = new Uint8Array(384);
+                this.cursorX = 0;
+                this.cursorY = 0;
+                this.cursorBlink = true;
+                this.lastX = 0;
+                this.lastY = 0;
+                
+                // AUDIO
+                this.audioContext = null;
+                this.soundEnabled = false;
+                
+                // BASIC
+                this.basicProgram = {};
+                this.basicVariables = {};
+                this.basicRunning = false;
+                this.basicCurrentLine = 0;
+                this.basicStack = [];
+                this.forStack = [];
+                this.whileStack = [];
+                this.repeatStack = [];
+                
+                this.speed = 2;
+                this.inputBuffer = "";
+                this.fs = {};
+                
+                this.canvas = document.getElementById('display-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.init();
+            }
+            
+            init() {
+                this.initAudio();
+                this.setupInput();
+                this.generateKeyboard();
+                this.clearScreen();
+                this.print("QUARTZ-4B 500Hz\n4-BIT CPU 4096 BYTES\n\nREADY.\n");
+                this.renderLoop();
+                
+                this.fs['DEMO.BAS'] = '10 PRINT "4-BIT POWER!"&#10;20 FOR I=0 TO 15&#10;30 PLOT I,I&#10;40 PLOT 63-I,I&#10;50 NEXT I&#10;60 CIRCLE 32,24,10&#10;70 FILL 32,24';
+                this.fs['FILL.BAS'] = '10 BOX 10,10,54,38&#10;20 FILL 32,24&#10;30 PRINT "FILLED!"';
+                updateFileList();
+            }
+            
+            initAudio() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.soundEnabled = true;
+                } catch(e) {}
+            }
+            
+            playTone(freq, duration) {
+                if (!this.soundEnabled || !this.audioContext) return;
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                osc.frequency.value = freq;
+                osc.type = 'square';
+                gain.gain.setValueAtTime(0.1, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+                osc.start();
+                osc.stop(this.audioContext.currentTime + duration);
+            }
+            
+            beep() { this.playTone(1200, 0.05); }
+            
+            setupInput() {
+                // CRITICAL: Capture keys at document level, prevent default for all except editor
+                document.addEventListener('keydown', (e) => {
+                    // Only skip if we're in the editor AND it's a normal typing key
+                    if (e.target === document.getElementById('editor') || 
+                        e.target === document.getElementById('machine-editor')) {
+                        // Allow normal typing in editors
+                        if (e.key !== 'Escape') return;
+                    }
+                    
+                    // Prevent default for all keys we handle
+                    if (['Backspace', 'Enter', ' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                    
+                    // Show input indicator
+                    const indicator = document.getElementById('input-indicator');
+                    indicator.classList.add('active');
+                    setTimeout(() => indicator.classList.remove('active'), 200);
+                    
+                    if (e.key === 'Backspace') {
+                        if (this.inputBuffer.length > 0) {
+                            this.inputBuffer = this.inputBuffer.slice(0, -1);
+                            this.putChar(8);
+                            this.beep();
+                        }
+                    } else if (e.key === 'Enter') {
+                        this.beep();
+                        this.processCommand(this.inputBuffer);
+                        this.inputBuffer = "";
+                    } else if (e.key === ' ') {
+                        this.inputBuffer += ' ';
+                        this.putChar(32);
+                        this.beep();
+                    } else if (e.key.length === 1 && e.key.charCodeAt(0) >= 32 && e.key.charCodeAt(0) < 127) {
+                        this.inputBuffer += e.key;
+                        this.putChar(e.key.charCodeAt(0));
+                        this.beep();
+                    }
+                }, true); // Use capture phase to get keys before they reach other elements
+            }
+            
+            // ========== VIDEO ==========
+            clearScreen() {
+                this.vramText.fill(0);
+                this.vramGfx.fill(0);
+                this.cursorX = 0;
+                this.cursorY = 0;
+                this.render();
+            }
+            
+            setMode(mode) {
+                this.videoMode = mode & 1;
+                this.clearScreen();
+            }
+            
+            print(str) {
+                for (let c of str) this.putChar(c.charCodeAt(0));
+            }
+            
+            printAt(x, y, str) {
+                this.cursorX = Math.min(x, 31);
+                this.cursorY = Math.min(y, 15);
+                this.print(str);
+            }
+            
+            putChar(code) {
+                if (code === 10) {
+                    this.cursorX = 0;
+                    this.cursorY++;
+                } else if (code === 8) {
+                    if (this.cursorX > 0) {
+                        this.cursorX--;
+                        this.vramText[this.cursorY * 32 + this.cursorX] = 0;
+                    }
+                } else if (code >= 32 && code < 127) {
+                    const addr = this.cursorY * 32 + this.cursorX;
+                    this.vramText[addr] = code;
+                    this.cursorX++;
+                    if (this.cursorX >= 32) {
+                        this.cursorX = 0;
+                        this.cursorY++;
+                    }
+                }
+                if (this.cursorY >= 16) {
+                    this.scrollUp();
+                    this.cursorY = 15;
+                }
+                this.render();
+            }
+            
+            scrollUp() {
+                for (let y = 0; y < 15; y++) {
+                    for (let x = 0; x < 32; x++) {
+                        this.vramText[y * 32 + x] = this.vramText[(y + 1) * 32 + x];
+                    }
+                }
+                for (let x = 0; x < 32; x++) this.vramText[15 * 32 + x] = 0;
+            }
+            
+            // ========== GRAPHICS ==========
+            plot(x, y) {
+                x = Math.floor(x); y = Math.floor(y);
+                if (x < 0 || x >= 64 || y < 0 || y >= 48) return;
+                const byteIdx = y * 8 + Math.floor(x / 8);
+                const bitIdx = 7 - (x % 8);
+                this.vramGfx[byteIdx] |= (1 << bitIdx);
+                if (this.videoMode === 1) this.render();
+            }
+            
+            unplot(x, y) {
+                x = Math.floor(x); y = Math.floor(y);
+                if (x < 0 || x >= 64 || y < 0 || y >= 48) return;
+                const byteIdx = y * 8 + Math.floor(x / 8);
+                const bitIdx = 7 - (x % 8);
+                this.vramGfx[byteIdx] &= ~(1 << bitIdx);
+                if (this.videoMode === 1) this.render();
+            }
+            
+            point(x, y) {
+                x = Math.floor(x); y = Math.floor(y);
+                if (x < 0 || x >= 64 || y < 0 || y >= 48) return 0;
+                const byteIdx = y * 8 + Math.floor(x / 8);
+                const bitIdx = 7 - (x % 8);
+                return (this.vramGfx[byteIdx] >> bitIdx) & 1;
+            }
+            
+            line(x1, y1, x2, y2) {
+                x1 = Math.floor(x1); y1 = Math.floor(y1);
+                x2 = Math.floor(x2); y2 = Math.floor(y2);
+                
+                let dx = Math.abs(x2 - x1);
+                let dy = Math.abs(y2 - y1);
+                let sx = x1 < x2 ? 1 : -1;
+                let sy = y1 < y2 ? 1 : -1;
+                let err = dx - dy;
+                
+                while (true) {
+                    this.plot(x1, y1);
+                    if (x1 === x2 && y1 === y2) break;
+                    let e2 = 2 * err;
+                    if (e2 > -dy) { err -= dy; x1 += sx; }
+                    if (e2 < dx) { err += dx; y1 += sy; }
+                }
+                this.lastX = x2; this.lastY = y2;
+            }
+            
+            drawTo(x, y) {
+                this.line(this.lastX, this.lastY, x, y);
+            }
+            
+            box(x1, y1, x2, y2) {
+                this.line(x1, y1, x2, y1);
+                this.line(x2, y1, x2, y2);
+                this.line(x2, y2, x1, y2);
+                this.line(x1, y2, x1, y1);
+            }
+            
+            circle(cx, cy, r) {
+                cx = Math.floor(cx); cy = Math.floor(cy); r = Math.floor(r);
+                let x = 0, y = r;
+                let d = 3 - 2 * r;
+                
+                while (y >= x) {
+                    this.plot(cx + x, cy + y); this.plot(cx - x, cy + y);
+                    this.plot(cx + x, cy - y); this.plot(cx - x, cy - y);
+                    this.plot(cx + y, cy + x); this.plot(cx - y, cy + x);
+                    this.plot(cx + y, cy - x); this.plot(cx - y, cy - x);
+                    x++;
+                    if (d > 0) { y--; d = d + 4 * (x - y) + 10; }
+                    else d = d + 4 * x + 6;
+                }
+            }
+            
+            triangle(x1, y1, x2, y2, x3, y3) {
+                this.line(x1, y1, x2, y2);
+                this.line(x2, y2, x3, y3);
+                this.line(x3, y3, x1, y1);
+            }
+            
+            fill(startX, startY) {
+                startX = Math.floor(startX);
+                startY = Math.floor(startY);
+                
+                if (startX < 0 || startX >= 64 || startY < 0 || startY >= 48) return;
+                if (this.point(startX, startY)) return;
+                
+                const stack = [[startX, startY]];
+                const visited = new Set();
+                
+                while (stack.length > 0) {
+                    const [x, y] = stack.pop();
+                    const key = x + ',' + y;
+                    
+                    if (visited.has(key)) continue;
+                    if (x < 0 || x >= 64 || y < 0 || y >= 48) continue;
+                    if (this.point(x, y)) continue;
+                    
+                    visited.add(key);
+                    this.plot(x, y);
+                    
+                    stack.push([x + 1, y]);
+                    stack.push([x - 1, y]);
+                    stack.push([x, y + 1]);
+                    stack.push([x, y - 1]);
+                }
+                
+                if (this.videoMode === 1) this.render();
+            }
+            
+            // ========== RENDER ==========
+            render() {
+                this.ctx.fillStyle = '#0a0a0a';
+                this.ctx.fillRect(0, 0, 320, 240);
+                
+                if (this.videoMode === 0) {
+                    this.ctx.fillStyle = '#33ff33';
+                    this.ctx.font = '16px VT323';
+                    this.ctx.textBaseline = 'top';
+                    this.ctx.shadowColor = '#33ff33';
+                    this.ctx.shadowBlur = 4;
+                    
+                    for (let y = 0; y < 16; y++) {
+                        for (let x = 0; x < 32; x++) {
+                            const c = this.vramText[y * 32 + x];
+                            if (c) {
+                                this.ctx.fillText(String.fromCharCode(c), x * 10 + 2, y * 15);
+                            }
+                        }
+                    }
+                    
+                    this.ctx.shadowBlur = 0;
+                    
+                    if (this.cursorBlink) {
+                        this.ctx.fillStyle = '#33ff33';
+                        this.ctx.fillRect(this.cursorX * 10, this.cursorY * 15 + 12, 8, 2);
+                    }
+                } else {
+                    this.ctx.fillStyle = '#33ff33';
+                    this.ctx.shadowColor = '#33ff33';
+                    this.ctx.shadowBlur = 2;
+                    
+                    for (let y = 0; y < 48; y++) {
+                        for (let x = 0; x < 64; x++) {
+                            if (this.point(x, y)) {
+                                this.ctx.fillRect(x * 5, y * 5, 4, 4);
+                            }
+                        }
+                    }
+                    
+                    this.ctx.shadowBlur = 0;
+                }
+            }
+            
+            renderLoop() {
+                setInterval(() => {
+                    this.cursorBlink = !this.cursorBlink;
+                    this.render();
+                }, 530);
+            }
+            
+            // ========== BASIC ==========
+            processCommand(line) {
+                this.print("\n");
+                
+                const match = line.match(/^(\d+)\s*(.*)/);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    const code = match[2].trim();
+                    if (code) this.basicProgram[num] = code;
+                    else delete this.basicProgram[num];
+                    updateProgramView();
+                    this.print("OK\n");
+                    return;
+                }
+                
+                this.executeBASICLine(line);
+                if (!this.basicRunning) this.print("READY.\n");
+            }
+            
+            async runBASIC() {
+                if (this.basicRunning) return;
+                
+                const lines = Object.keys(this.basicProgram).map(Number).sort((a,b) => a-b);
+                if (lines.length === 0) {
+                    this.print("?NO PROGRAM\n");
+                    return;
+                }
+                
+                this.basicRunning = true;
+                let idx = 0;
+                
+                while (this.basicRunning && idx < lines.length) {
+                    this.basicCurrentLine = lines[idx];
+                    const result = this.executeBASICLine(this.basicProgram[this.basicCurrentLine]);
+                    
+                    this.updateDisplay();
+                    
+                    if (result === 'STOP') break;
+                    if (result === 'JUMP') {
+                        const newIdx = lines.indexOf(this.basicCurrentLine);
+                        if (newIdx >= 0) { idx = newIdx; continue; }
+                        break;
+                    }
+                    
+                    idx++;
+                    await new Promise(r => setTimeout(r, this.speed));
+                }
+                
+                this.basicRunning = false;
+                this.print("READY.\n");
+            }
+            
+            executeBASICLine(line) {
+                const tokens = this.tokenize(line);
+                if (!tokens.length) return 'OK';
+                
+                let cmd = tokens[0];
+                let args = tokens.slice(1);
+                
+                // Assignment check
+                if (cmd.length >= 2 && cmd[1] === '=' && cmd[0] >= 'A' && cmd[0] <= 'Z') {
+                    const varName = cmd[0];
+                    const expr = cmd.substring(2) + args.join('');
+                    this.basicVariables[varName] = this.evalExpr(expr) & 0xF;
+                    return 'OK';
+                }
+                
+                if (cmd === 'LET') {
+                    if (args[1] === '=') {
+                        this.basicVariables[args[0]] = this.evalExpr(args.slice(2).join('')) & 0xF;
+                    } else if (args[0] && args[0].includes('=')) {
+                        const parts = args[0].split('=');
+                        this.basicVariables[parts[0]] = this.evalExpr(parts[1]) & 0xF;
+                    }
+                    return 'OK';
+                }
+                
+                switch(cmd) {
+                    case 'REM': return 'OK';
+                    case 'CLS': this.clearScreen(); return 'OK';
+                    case 'MODE': this.setMode(parseInt(args[0]) || 0); return 'OK';
+                    
+                    case 'PRINT':
+                    case '?':
+                        if (args[0] === '@') {
+                            const x = parseInt(args[1]) || 0;
+                            const y = parseInt(args[3]) || 0;
+                            let out = "";
+                            for (let i = 4; i < args.length; i++) {
+                                if (args[i].startsWith('"')) out += args[i].slice(1, -1);
+                                else if (args[i] === ';') {}
+                                else if (args[i] === ',') out += " ";
+                                else out += this.evalExpr(args.slice(i).join(''));
+                            }
+                            this.printAt(x, y, out);
+                        } else {
+                            let out = "";
+                            for (let i = 0; i < args.length; i++) {
+                                if (args[i].startsWith('"')) out += args[i].slice(1, -1);
+                                else if (args[i] === ';') {}
+                                else if (args[i] === ',') out += " ";
+                                else {
+                                    out += this.evalExpr(args.slice(i).join(''));
+                                    break;
+                                }
+                            }
+                            this.print(out + "\n");
+                        }
+                        return 'OK';
+                    
+                    case 'PLOT': this.plot(args[0], args[2]); return 'OK';
+                    case 'UNPLOT': this.unplot(args[0], args[2]); return 'OK';
+                    case 'LINE': this.line(args[0], args[2], args[4], args[6]); return 'OK';
+                    case 'DRAWTO': this.drawTo(args[0], args[2]); return 'OK';
+                    case 'BOX': this.box(args[0], args[2], args[4], args[6]); return 'OK';
+                    case 'CIRCLE': this.circle(args[0], args[2], args[4]); return 'OK';
+                    case 'TRIANGLE': this.triangle(args[0], args[2], args[4], args[6], args[8], args[10]); return 'OK';
+                    case 'FILL': this.fill(args[0], args[2]); return 'OK';
+                    
+                    case 'INC': 
+                        this.basicVariables[args[0]] = ((this.basicVariables[args[0]] || 0) + 1) & 0xF;
+                        return 'OK';
+                    case 'DEC':
+                        this.basicVariables[args[0]] = ((this.basicVariables[args[0]] || 0) - 1) & 0xF;
+                        return 'OK';
+                    
+                    case 'GOTO':
+                        this.basicCurrentLine = parseInt(args[0]);
+                        return 'JUMP';
+                    case 'GOSUB':
+                        this.basicStack.push(this.basicCurrentLine);
+                        this.basicCurrentLine = parseInt(args[0]);
+                        return 'JUMP';
+                    case 'RETURN':
+                        return 'OK';
+                    
+                    case 'IF':
+                        const thenIdx = args.indexOf('THEN');
+                        if (thenIdx >= 0) {
+                            const cond = args.slice(0, thenIdx).join('');
+                            const target = args[thenIdx + 1];
+                            if (this.evalCond(cond)) {
+                                if (!isNaN(parseInt(target))) {
+                                    this.basicCurrentLine = parseInt(target);
+                                    return 'JUMP';
+                                } else {
+                                    return this.executeBASICLine(args.slice(thenIdx + 1).join(' '));
+                                }
+                            }
+                        }
+                        return 'OK';
+                    
+                    case 'FOR':
+                        const varName = args[0];
+                        const start = this.evalExpr(args[2]) & 0xF;
+                        let end = this.evalExpr(args[4]) & 0xF;
+                        let step = 1;
+                        const stepIdx = args.indexOf('STEP');
+                        if (stepIdx >= 0) step = this.evalExpr(args[stepIdx + 1]) & 0xF || 1;
+                        
+                        this.basicVariables[varName] = start;
+                        this.forStack.push({
+                            var: varName,
+                            end: end,
+                            step: step,
+                            line: this.basicCurrentLine
+                        });
+                        return 'OK';
+                    
+                    case 'NEXT':
+                        const frame = this.forStack[this.forStack.length - 1];
+                        if (frame) {
+                            this.basicVariables[frame.var] = (this.basicVariables[frame.var] + frame.step) & 0xF;
+                            if ((frame.step > 0 && this.basicVariables[frame.var] <= frame.end) ||
+                                (frame.step < 0 && this.basicVariables[frame.var] >= frame.end)) {
+                                this.basicCurrentLine = frame.line;
+                                return 'JUMP';
+                            } else {
+                                this.forStack.pop();
+                            }
+                        }
+                        return 'OK';
+                    
+                    case 'WHILE':
+                        this.whileStack.push(this.basicCurrentLine);
+                        return 'OK';
+                    case 'WEND':
+                        if (this.whileStack.length) {
+                            this.basicCurrentLine = this.whileStack[this.whileStack.length - 1];
+                            return 'JUMP';
+                        }
+                        return 'OK';
+                    
+                    case 'REPEAT':
+                        this.repeatStack.push(this.basicCurrentLine);
+                        return 'OK';
+                    case 'UNTIL':
+                        const untilCond = args.join('');
+                        if (!this.evalCond(untilCond) && this.repeatStack.length) {
+                            this.basicCurrentLine = this.repeatStack[this.repeatStack.length - 1];
+                            return 'JUMP';
+                        } else {
+                            this.repeatStack.pop();
+                        }
+                        return 'OK';
+                    
+                    case 'POKE':
+                        this.ram[this.evalExpr(args[0]) & 0xFFF] = this.evalExpr(args[2]) & 0xFF;
+                        return 'OK';
+                    case 'SYS':
+                    case 'CALL':
+                        this.pc = this.evalExpr(args[0]) & 0xFFF;
+                        this.runMachineCode();
+                        return 'OK';
+                    case 'WAIT': return 'OK';
+                    case 'BEEP': this.beep(); return 'OK';
+                    case 'END':
+                    case 'STOP': return 'STOP';
+                    
+                    case 'LIST':
+                        const lines = Object.keys(this.basicProgram).map(Number).sort((a,b) => a-b);
+                        for (let n of lines) this.print(n + " " + this.basicProgram[n] + "\n");
+                        return 'OK';
+                    case 'NEW':
+                        this.basicProgram = {};
+                        this.basicVariables = {};
+                        updateProgramView();
+                        return 'OK';
+                    case 'RUN': return 'OK';
+                    
+                    case 'SAVE':
+                        const saveName = args[0]?.replace(/"/g, '') || 'UNTITLED.BAS';
+                        const data = Object.keys(this.basicProgram).map(n => n + " " + this.basicProgram[n]).join('\n');
+                        this.fs[saveName] = data;
+                        updateFileList();
+                        this.print("SAVED " + saveName + "\n");
+                        return 'OK';
+                    case 'LOAD':
+                        const loadName = args[0]?.replace(/"/g, '');
+                        if (loadName && this.fs[loadName]) {
+                            this.loadFromText(this.fs[loadName]);
+                            this.print("LOADED " + loadName + "\n");
+                        } else {
+                            this.print("?FILE NOT FOUND\n");
+                        }
+                        return 'OK';
+                    case 'FILES':
+                    case 'DIR':
+                        this.print("FILES:\n");
+                        for (let f in this.fs) this.print("  " + f + "\n");
+                        return 'OK';
+                    case 'DELETE':
+                        delete this.fs[args[0]?.replace(/"/g, '')];
+                        updateFileList();
+                        return 'OK';
+                    case 'HELP':
+                        this.print("SEE REFERENCE BELOW\n");
+                        return 'OK';
+                    default:
+                        try {
+                            const val = this.evalExpr(tokens.join(''));
+                            if (!isNaN(val)) this.print((val & 0xF) + "\n");
+                        } catch(e) {
+                            this.print("?SYNTAX ERROR\n");
+                        }
+                        return 'OK';
+                }
+            }
+            
+            tokenize(line) {
+                const tokens = [];
+                let cur = '';
+                let inStr = false;
+                
+                for (let c of line.toUpperCase()) {
+                    if (c === '"' && !inStr) {
+                        if (cur) tokens.push(cur);
+                        cur = '"';
+                        inStr = true;
+                    } else if (c === '"' && inStr) {
+                        tokens.push(cur + '"');
+                        cur = '';
+                        inStr = false;
+                    } else if (inStr) {
+                        cur += c;
+                    } else if (' +-*/=<>(),;@'.includes(c)) {
+                        if (cur) tokens.push(cur);
+                        if (c !== ' ') tokens.push(c);
+                        cur = '';
+                    } else {
+                        cur += c;
+                    }
+                }
+                if (cur) tokens.push(cur);
+                return tokens;
+            }
+            
+            evalExpr(e) {
+                if (!e) return 0;
+                e = e.toString().replace(/\s/g, '');
+                
+                e = e.replace(/PEEK\(([^)]+)\)/g, (m, addr) => this.ram[this.evalExpr(addr) & 0xFFF]);
+                e = e.replace(/POINT\(([^,]+),([^)]+)\)/g, (m, x, y) => this.point(this.evalExpr(x), this.evalExpr(y)));
+                e = e.replace(/RND\(([^)]+)\)/g, (m, n) => (Math.floor(Math.random() * this.evalExpr(n)) + 1) & 0xF);
+                
+                for (let v in this.basicVariables) {
+                    if (v.length === 1 && v >= 'A' && v <= 'Z') {
+                        e = e.split(v).join(this.basicVariables[v]);
+                    }
+                }
+                
+                try {
+                    return Function('"use strict"; return (' + e + ')')() & 0xF;
+                } catch {
+                    return 0;
+                }
+            }
+            
+            evalCond(c) {
+                c = c.replace(/\s/g, '');
+                for (let v in this.basicVariables) {
+                    c = c.split(v).join(this.basicVariables[v]);
+                }
+                if (c.includes('<=')) {
+                    const [a,b] = c.split('<=');
+                    return (this.evalExpr(a) & 0xF) <= (this.evalExpr(b) & 0xF);
+                }
+                if (c.includes('>=')) {
+                    const [a,b] = c.split('>=');
+                    return (this.evalExpr(a) & 0xF) >= (this.evalExpr(b) & 0xF);
+                }
+                if (c.includes('<>')) {
+                    const [a,b] = c.split('<>');
+                    return (this.evalExpr(a) & 0xF) !== (this.evalExpr(b) & 0xF);
+                }
+                if (c.includes('<')) {
+                    const [a,b] = c.split('<');
+                    return (this.evalExpr(a) & 0xF) < (this.evalExpr(b) & 0xF);
+                }
+                if (c.includes('>')) {
+                    const [a,b] = c.split('>');
+                    return (this.evalExpr(a) & 0xF) > (this.evalExpr(b) & 0xF);
+                }
+                if (c.includes('=')) {
+                    const [a,b] = c.split('=');
+                    return (this.evalExpr(a) & 0xF) === (this.evalExpr(b) & 0xF);
+                }
+                return (this.evalExpr(c) & 0xF) !== 0;
+            }
+            
+            // ========== MACHINE CODE ==========
+            loadMachineCode(hexString) {
+                const bytes = hexString.match(/[0-9A-Fa-f]{2}/g);
+                if (!bytes) return;
+                for (let i = 0; i < bytes.length && i < 4096; i++) {
+                    this.ram[i] = parseInt(bytes[i], 16);
+                }
+                this.print("LOADED " + bytes.length + " BYTES TO $000\n");
+            }
+            
+            async runMachineCode() {
+                this.halted = false;
+                let cycles = 0;
+                const maxCycles = 10000;
+                
+                while (!this.halted && cycles < maxCycles) {
+                    this.fetch();
+                    this.execute();
+                    this.updateDisplay();
+                    cycles++;
+                    if (this.speed > 0) await new Promise(r => setTimeout(r, this.speed));
+                }
+                
+                if (cycles >= maxCycles) this.print("?TIMEOUT\n");
+            }
+            
+            fetch() {
+                this.ir = this.ram[this.pc & 0xFFF];
+                this.pc = (this.pc + 1) & 0xFFF;
+            }
+            
+            execute() {
+                const op = (this.ir >> 4) & 0xF;
+                const n = this.ir & 0xF;
+                
+                switch(op) {
+                    case 0x0: break;
+                    case 0x1: this.a = n; break;
+                    case 0x2:
+                        const sum = this.a + n;
+                        this.flags.c = sum > 15 ? 1 : 0;
+                        this.a = sum & 0xF;
+                        break;
+                    case 0x3:
+                        const diff = this.a - n;
+                        this.flags.c = diff < 0 ? 1 : 0;
+                        this.a = (diff + 16) & 0xF;
+                        break;
+                    case 0x4:
+                        this.ram[(this.x + n) & 0xFFF] = this.a;
+                        break;
+                    case 0x5:
+                        this.pc = (this.x + n) & 0xFFF;
+                        break;
+                    case 0x6:
+                        if (this.flags.z) this.pc = (this.x + n) & 0xFFF;
+                        break;
+                    case 0x7:
+                        if (this.flags.c) this.pc = (this.x + n) & 0xFFF;
+                        break;
+                    case 0x8:
+                        this.x = (this.x & 0xFF0) | n;
+                        break;
+                    case 0x9:
+                        this.x = (this.x + 1) & 0xFFF;
+                        break;
+                    case 0xA:
+                        this.x = (this.x - 1) & 0xFFF;
+                        break;
+                    case 0xB:
+                        this.ram[this.sp-- & 0xFFF] = this.pc & 0xF;
+                        this.ram[this.sp-- & 0xFFF] = (this.pc >> 4) & 0xF;
+                        this.ram[this.sp-- & 0xFFF] = (this.pc >> 8) & 0xF;
+                        this.pc = (this.x + n) & 0xFFF;
+                        break;
+                    case 0xC:
+                        const hi = this.ram[++this.sp & 0xFFF] || 0;
+                        const mid = this.ram[++this.sp & 0xFFF] || 0;
+                        const lo = this.ram[++this.sp & 0xFFF] || 0;
+                        this.pc = ((hi << 8) | (mid << 4) | lo) & 0xFFF;
+                        break;
+                    case 0xD:
+                        this.print(String.fromCharCode(0x30 + this.a));
+                        break;
+                    case 0xE:
+                        this.a = 0;
+                        break;
+                    case 0xF:
+                        this.halted = true;
+                        break;
+                }
+                
+                this.flags.z = this.a === 0 ? 1 : 0;
+                this.flags.n = (this.a & 0x8) ? 1 : 0;
+            }
+            
+            pause() {
+                this.basicRunning = false;
+                this.halted = true;
+            }
+            
+            reset() {
+                this.pc = 0; this.a = 0; this.b = 0; this.x = 0;
+                this.sp = 0xFF0; this.ir = 0;
+                this.flags = { z: 0, n: 0, c: 0, v: 0 };
+                this.basicProgram = {};
+                this.basicVariables = {};
+                this.basicRunning = false;
+                this.halted = false;
+                this.forStack = [];
+                this.whileStack = [];
+                this.repeatStack = [];
+                this.inputBuffer = "";
+                this.clearScreen();
+                this.print("RESET\n\nREADY.\n");
+                this.updateDisplay();
+                updateProgramView();
+            }
+            
+            updateDisplay() {
+                document.getElementById('reg-pc').textContent = this.pc.toString(16).padStart(3, '0').toUpperCase();
+                document.getElementById('reg-a').textContent = this.a.toString(16).toUpperCase();
+                document.getElementById('reg-x').textContent = this.x.toString(16).padStart(3, '0').toUpperCase();
+                document.getElementById('reg-sp').textContent = this.sp.toString(16).padStart(3, '0').toUpperCase();
+                const f = (this.flags.z ? 'Z' : '-') + (this.flags.n ? 'N' : '-') + 
+                         (this.flags.c ? 'C' : '-') + (this.flags.v ? 'V' : '-');
+                document.getElementById('reg-f').textContent = f;
+            }
+            
+            loadFromText(text) {
+                this.basicProgram = {};
+                text.split('\n').forEach(line => {
+                    const m = line.match(/^(\d+)\s*(.*)/);
+                    if (m && m[2].trim()) this.basicProgram[parseInt(m[1])] = m[2].trim();
+                });
+                updateProgramView();
+            }
+            
+            generateKeyboard() {
+                const keys = [
+                    '`','1','2','3','4','5','6','7','8','9','0','-','=','BS',
+                    'Q','W','E','R','T','Y','U','I','O','P','[',']','\\',
+                    'A','S','D','F','G','H','J','K','L',';','\'','ENTER',
+                    'Z','X','C','V','B','N','M',',','.','/','SHIFT',
+                    'CTRL','ALT','SPACE','ALT','CTRL'
+                ];
+                
+                const kb = document.getElementById('virtual-keyboard');
+                keys.forEach(k => {
+                    const key = document.createElement('div');
+                    key.className = 'key';
+                    key.textContent = k === 'BS' ? '⌫' : k === 'ENTER' ? '↵' : k;
+                    if (['ENTER','SHIFT'].includes(k)) key.classList.add('wide');
+                    if (k === 'SPACE') { key.classList.add('space'); key.textContent = ''; }
+                    
+                    key.onmousedown = () => {
+                        key.classList.add('pressed');
+                        this.handleVirtualKey(k);
+                    };
+                    key.onmouseup = () => key.classList.remove('pressed');
+                    key.onmouseleave = () => key.classList.remove('pressed');
+                    kb.appendChild(key);
+                });
+            }
+            
+            handleVirtualKey(k) {
+                this.beep();
+                if (k === 'BS') {
+                    if (this.inputBuffer.length > 0) {
+                        this.inputBuffer = this.inputBuffer.slice(0, -1);
+                        this.putChar(8);
+                    }
+                } else if (k === 'ENTER') {
+                    this.processCommand(this.inputBuffer);
+                    this.inputBuffer = "";
+                } else if (k === 'SPACE') {
+                    this.inputBuffer += ' ';
+                    this.putChar(32);
+                } else if (k.length === 1) {
+                    const char = k.toLowerCase();
+                    this.inputBuffer += char;
+                    this.putChar(char.charCodeAt(0));
+                }
+            }
+        }
+
+        // Global functions
+        function togglePanels() {
+            document.getElementById('panels').classList.toggle('visible');
+        }
+
+        function toggleKeyboard() {
+            document.getElementById('keyboard-section').classList.toggle('visible');
+        }
+
+        function loadFromEditor() {
+            const text = document.getElementById('editor').value;
+            computer.loadFromText(text);
+            computer.print("LOADED FROM EDITOR\nREADY.\n");
+            // Don't focus editor after loading
+        }
+
+        function clearEditor() {
+            document.getElementById('editor').value = '';
+        }
+
+        function saveFile() {
+            const name = prompt("Filename:", "PROG.BAS");
+            if (name) {
+                const txt = Object.keys(computer.basicProgram).map(n => n + " " + computer.basicProgram[n]).join('\n');
+                computer.fs[name] = txt;
+                updateFileList();
+                computer.print("SAVED " + name + "\n");
+            }
+        }
+
+        function loadMachineCode() {
+            const hex = document.getElementById('machine-editor').value;
+            computer.loadMachineCode(hex);
+        }
+
+        function updateFileList() {
+            const list = document.getElementById('file-list');
+            if (!computer.fs || Object.keys(computer.fs).length === 0) {
+                list.innerHTML = 'No files';
+                return;
+            }
+            list.innerHTML = Object.keys(computer.fs).map(f => 
+                `<div style="cursor: pointer;" onclick="loadFile('${f}')" onmouseover="this.style.color='#3f3'" onmouseout="this.style.color='#666'">${f}</div>`
+            ).join('');
+        }
+
+        function loadFile(name) {
+            document.getElementById('editor').value = computer.fs[name];
+            loadFromEditor();
+        }
+
+        function updateProgramView() {
+            const div = document.getElementById('program-view');
+            const lines = Object.keys(computer.basicProgram).map(Number).sort((a,b) => a-b);
+            if (lines.length === 0) {
+                div.innerHTML = 'Empty';
+                return;
+            }
+            div.innerHTML = lines.map(n => `<div>${n} ${computer.basicProgram[n].substring(0, 25)}</div>`).join('');
+        }
+
+        function adjustBrightness() {
+            const canvas = document.getElementById('display-canvas');
+            const current = canvas.style.filter;
+            canvas.style.filter = current === 'brightness(1.5)' ? 'brightness(0.8)' : 'brightness(1.5)';
+            computer.beep();
+        }
+
+        // Init
+        const computer = new Quartz4B();
+    </script>
+</body>
+</html>
