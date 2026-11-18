@@ -435,7 +435,8 @@ void elite_enter(void); void elite_frame(u32 t); void elite_key(u8 sc, u8 rel, u
 void city_enter(void); void city_frame(u32 t); void city_key(u8 sc, u8 rel, u8 a); void city_mouse(int mx,int my,int dx,int dy,u8 btn,u8 prev); void city_exit(void);
 void pin_enter(void); void pin_frame(u32 t); void pin_key(u8 sc, u8 rel, u8 a); void pin_exit(void);
 void calc_enter(void); void calc_frame(u32 t); void calc_key(u8 sc, u8 rel, u8 a); void calc_mouse(int mx,int my,int dx,int dy,u8 btn,u8 prev);
-void wifiapp_enter(void); void wifiapp_frame(u32 t); void wifiapp_key(u8 sc, u8 rel, u8 a); void wifiapp_exit(void);\nvoid zx81_app_enter(void); void zx81_app_frame(u32 t); void zx81_app_key(u8 sc, u8 rel, u8 a); void zx81_app_exit(void);
+void wifiapp_enter(void); void wifiapp_frame(u32 t); void wifiapp_key(u8 sc, u8 rel, u8 a); void wifiapp_exit(void);
+void zx81_app_enter(void); void zx81_app_frame(u32 t); void zx81_app_key(u8 sc, u8 rel, u8 a); void zx81_app_exit(void);
 
 
 

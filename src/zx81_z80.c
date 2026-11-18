@@ -67,8 +67,8 @@ void z80_step(z80_t*c){
  case 0x5F:c->a=c->r;c->f=(c->f&F_C)|sz53(c->a)|(c->iff2?F_PV:0);break;
  case 0xA0:case 0xA8:case 0xB0:case 0xB8:{int dir=(e==0xA8||e==0xB8)?-1:1;v=rd(c,hl(c));wr(c,de(c),v);sethl(c,hl(c)+dir);setde(c,de(c)+dir);setbc(c,bc(c)-1);c->f=(c->f&(F_S|F_Z|F_C))|(bc(c)?F_PV:0);if((e==0xB0||e==0xB8)&&bc(c))c->pc-=2;break;}
  case 0xA1:case 0xA9:case 0xB1:case 0xB9:v=rd(c,hl(c));alu(c,7,v);sethl(c,hl(c)+((e==0xA9||e==0xB9)?-1:1));setbc(c,bc(c)-1);if((e==0xB1||e==0xB9)&&bc(c)&&!(c->f&F_Z))c->pc-=2;break;
- case 0xA2:case 0xAA:case 0xB2:case 0xBA:v=rd(c,hl(c));outb(bc(c),v);sethl(c,hl(c)+((e==0xAA||e==0xBA)?-1:1));setbc(c,bc(c)-1);c->f=(c->f&F_C)|(bc(c)?F_PV:0)|F_N;break;
- case 0xA3:case 0xAB:case 0xB3:case 0xBB:v=inb(bc(c));wr(c,hl(c),v);sethl(c,hl(c)+((e==0xAB||e==0xBB)?-1:1));setbc(c,bc(c)-1);c->f=(c->f&F_C)|(bc(c)?F_PV:0)|F_N;break;
+ case 0xA2:case 0xAA:case 0xB2:case 0xBA:v=rd(c,hl(c));if(c->io_write)c->io_write(bc(c),v,c->ctx);sethl(c,hl(c)+((e==0xAA||e==0xBA)?-1:1));setbc(c,bc(c)-1);c->f=(c->f&F_C)|(bc(c)?F_PV:0)|F_N;break;
+ case 0xA3:case 0xAB:case 0xB3:case 0xBB:v=c->io_read?c->io_read(bc(c),c->ctx):0xFF;wr(c,hl(c),v);sethl(c,hl(c)+((e==0xAB||e==0xBB)?-1:1));setbc(c,bc(c)-1);c->f=(c->f&F_C)|(bc(c)?F_PV:0)|F_N;break;
  default:(void)ey;(void)ez;break;}c->tstates+=12;if(c->ei_delay)c->ei_delay--;return;}
  if(x==0){
   switch(z){
@@ -86,7 +86,7 @@ void z80_step(z80_t*c){
  case 0:if((y==0&&!(c->f&F_Z))||(y==1&&(c->f&F_Z))||(y==2&&!(c->f&F_C))||(y==3&&(c->f&F_C))||(y==4&&!(c->f&F_PV))||(y==5&&(c->f&F_PV))||(y==6&&!(c->f&F_S))||(y==7&&(c->f&F_S)))c->pc=pop(c);else c->sp+=0;break;
  case 1:if(!q){nn=pop(c);if(p==0){c->c=nn;c->b=nn>>8;}else if(p==1){c->e=nn;c->d=nn>>8;}else if(p==2)sethl(c,nn);else {c->f=c->a;c->a=nn>>8;}}else {if(p==0)c->pc=pop(c);else if(p==1){c->pc=pop(c);c->iff1=c->iff2;}else if(p==2)c->pc=hl(c);else c->sp=hl(c);}break;
  case 2:nn=fetch16(c);if((y==0&&!(c->f&F_Z))||(y==1&&(c->f&F_Z))||(y==2&&!(c->f&F_C))||(y==3&&(c->f&F_C))||(y==4&&!(c->f&F_PV))||(y==5&&(c->f&F_PV))||(y==6&&!(c->f&F_S))||(y==7&&(c->f&F_S)))c->pc=nn;break;
- case 3:nn=fetch16(c);if(y==0)c->pc=nn;else if(y==2)outb(c->a<<8|fetch(c),c->a);else if(y==3)c->a=inb(c->a<<8|fetch(c));else if(y==4){u16 t=rd(c,nn)|((u16)rd(c,nn+1)<<8);wr(c,nn,c->l);wr(c,nn+1,c->h);sethl(c,t);}else if(y==6)c->iff1=c->iff2=0;else if(y==7)c->iff1=c->iff2=1,c->ei_delay=2;break;
+ case 3:nn=fetch16(c);if(y==0)c->pc=nn;else if(y==2){n=fetch(c);if(c->io_write)c->io_write((u16)((c->a<<8)|n),c->a,c->ctx);}else if(y==3){n=fetch(c);c->a=c->io_read?c->io_read((u16)((c->a<<8)|n),c->ctx):0xFF;}else if(y==4){u16 t=rd(c,nn)|((u16)rd(c,nn+1)<<8);wr(c,nn,c->l);wr(c,nn+1,c->h);sethl(c,t);}else if(y==6)c->iff1=c->iff2=0;else if(y==7)c->iff1=c->iff2=1,c->ei_delay=2;break;
  case 4:nn=fetch16(c);if((y==0&&!(c->f&F_Z))||(y==1&&(c->f&F_Z))||(y==2&&!(c->f&F_C))||(y==3&&(c->f&F_C))||(y==4&&!(c->f&F_PV))||(y==5&&(c->f&F_PV))||(y==6&&!(c->f&F_S))||(y==7&&(c->f&F_S))){push(c,c->pc);c->pc=nn;}break;
  case 5:if(!q){nn=(p==0?bc(c):p==1?de(c):p==2?hl(c):(u16)((c->a<<8)|c->f));push(c,nn);}else if(p==0){nn=fetch16(c);push(c,c->pc);c->pc=nn;}break;
  case 6:alu(c,y,fetch(c));break;
