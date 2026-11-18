@@ -13,7 +13,7 @@ const app_t app_list[] = {
     { {"Űrkadét Flipper",     "Space Cadet Pinball"}, pin_enter, pin_frame, pin_key,   0,            pin_exit,   0 },
     { {"Képernyővédők",       "Screensavers"},   savermenu_enter, savermenu_frame, savermenu_key, 0, 0, savermenu_esc },
     { {"Számológép",          "Calculator"},     calc_enter,   calc_frame,   calc_key,   calc_mouse,   0,          0 },
-    { {"Wi-Fi",               "Wi-Fi"},          wifiapp_enter, wifiapp_frame, wifiapp_key, 0,        wifiapp_exit, 0 },
+    { {"Wi-Fi",               "Wi-Fi"},          wifiapp_enter, wifiapp_frame, wifiapp_key, 0,        wifiapp_exit, 0 },\n    { {"ZX81 Retro",          "ZX81 Retro"},       zx81_app_enter, zx81_app_frame, zx81_app_key, 0, zx81_app_exit, 0 },
 };
 const int APP_COUNT = sizeof(app_list) / sizeof(app_list[0]);
 
