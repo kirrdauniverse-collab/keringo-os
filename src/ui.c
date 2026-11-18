@@ -530,7 +530,22 @@ static void draw_panel_programok(texture_t *t, u32 tick) {
     char b[80];
     int yy = 40;
     t_text(t, 14, yy, lang ? "APPLICATIONS" : "ALKALMAZÁSOK", C_AMBER); yy += 20;
-    for (int i = 0; i < APP_COUNT && yy < t->h - 66; i++) {
+    /* 0.4: görgetés — a 16 app már nem fér ki a panelbe, a kurzor maradjon látható */
+    int rows = (t->h - 66 - yy) / 18; if (rows < 1) rows = 1;
+    if (rows > APP_COUNT) rows = APP_COUNT;
+    int first = 0;
+    if (app_sel >= rows) first = app_sel - rows + 1;
+    if (first + rows > APP_COUNT) first = APP_COUNT - rows;
+    if (first < 0) first = 0;
+    int vis = rows;
+    if (first > 0) vis--;
+    if (first + vis < APP_COUNT) vis--;
+    if (vis < 1) vis = 1;
+    if (app_sel >= first + vis) first = app_sel - vis + 1;
+    if (app_sel < first) first = app_sel;
+    if (first < 0) first = 0;
+    if (first > 0) { t_text(t, 14, yy, "...", C_MUTED); yy += 18; }
+    for (int i = first; i < first + vis && i < APP_COUNT; i++) {
         ksnprintf(b, sizeof(b), "%s %s", (app_sel == i) ? ">" : " ", app_list[i].nev[lang]);
         t_text(t, 14, yy, b, (app_sel == i) ? C_AMBER : C_TEXT);
         /* gyorsgomb jelzés */
@@ -545,6 +560,7 @@ static void draw_panel_programok(texture_t *t, u32 tick) {
         if (hk) t_text(t, 400, yy, hk, C_MUTED);
         yy += 18;
     }
+    if (first + vis < APP_COUNT) { t_text(t, 14, yy, "...", C_MUTED); yy += 18; }
     yy += 8;
     t_text(t, 14, yy, lang ? "Galaxy: F3 Paint F4 Text F7 Labirintus" : "Galaxisban: F3 Paint F4 Szöveg F7 Labirintus", C_MUTED); yy += 15;
     t_text(t, 14, yy, lang ? "F9 Doom F10 Elite F11 City F12 Pinball" : "F9 Pokoljáró F10 Csillagvadász F11 Város F12 Flipper", C_MUTED); yy += 15;
