@@ -134,3 +134,48 @@ int iso_find(const char *name, u32 *lba, u32 *size) {
     }
     return 0;
 }
+
+/* 0.5: útvonal szerinti keresés (pl. "boot/keringo.elf") — legfeljebb 4 szint,
+ * a könyvtárakat iso_list-tel járjuk végig. */
+static int icase_eq(const char *a, const char *b) {
+    while (*a || *b) {
+        char ca = *a ? (*a >= 'a' && *a <= 'z' ? *a - 32 : *a) : 0;
+        char cb = *b ? (*b >= 'a' && *b <= 'z' ? *b - 32 : *b) : 0;
+        if (ca != cb) return 0;
+        if (*a) a++; if (*b) b++;
+    }
+    return 1;
+}
+int iso_find_path(const char *path, u32 *lba, u32 *size) {
+    if (!iso_ok) return 0;
+    u32 dir_lba = root_lba, dir_size = root_size;
+    const char *p = path;
+    while (*p == '/') p++;
+    for (int depth = 0; depth < 4; depth++) {
+        char comp[64];
+        int c = 0;
+        while (*p && *p != '/' && c < 63) comp[c++] = *p++;
+        comp[c] = 0;
+        while (*p == '/') p++;
+        if (!c) break;
+        char names[16][64]; u32 lbas[16], sizes[16]; u8 flags[16];
+        int n = iso_list(dir_lba, dir_size, names, lbas, sizes, flags, 16);
+        int hit = -1;
+        for (int i = 0; i < n; i++) {
+            if (!icase_eq(comp, names[i])) continue;
+            if (flags[i] & 2) {                      /* könyvtár: lejjebb */
+                dir_lba = lbas[i];
+                dir_size = sizes[i];
+                hit = i;
+                break;
+            }
+            if (*p == 0) {                            /* fájl az útvonal végén */
+                *lba = lbas[i];
+                *size = sizes[i];
+                return 1;
+            }
+        }
+        if (hit < 0 || *p == 0) return 0;
+    }
+    return 0;
+}

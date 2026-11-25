@@ -30,9 +30,22 @@ tcpconn_t *tcp_alloc(void) {
     return 0;
 }
 
-int tcp_connected(tcpconn_t *c) { return c && c->state == 2; }
+int tcp_connected(tcpconn_t *c) { return c && (c->state == 2); }
 
 static u16 lport_next = 40000;
+
+/* 0.5 Távvezérlő: figyelő (server) socket — 4-es állapot, bármely társról elfogad */
+int tcp_listen(tcpconn_t *c, u16 port) {
+    if (!c) return 0;
+    c->rip = 0; c->rport = 0;
+    c->lport = port;
+    c->iss = (tick_count() << 8) | 0x24543300u;
+    c->snd_nxt = c->iss + 1;
+    c->snd_una = c->iss;
+    c->rcv_nxt = 0;
+    c->state = 4;                          /* LISTEN */
+    return 1;
+}
 
 int tcp_connect(tcpconn_t *c, u32 rip, u16 rport) {
     if (!c || !net_dev) return 0;
@@ -54,9 +67,21 @@ int tcp_connect(tcpconn_t *c, u32 rip, u16 rport) {
         tput_be32(tbuf + 8, 0);
         tbuf[12] = 0x60;                    /* 24 bájt fejléc (MSS) */
         tbuf[13] = TCPF_SYN;
-        *(u16 *)(tbuf + 14) = 0x2000;
-        *(u16 *)(tbuf + 16) = 0; *(u16 *)(tbuf + 18) = 0;
+        tbuf[14] = 0x20; tbuf[15] = 0x00;   /* ablak = 0x2000 (hálózati sorrend) */
+        tbuf[16] = 0; tbuf[17] = 0; tbuf[18] = 0; tbuf[19] = 0;
         for (int i = 0; i < 4; i++) tbuf[20 + i] = opt[i];
+        /* 0.5: ellenőrző összeg a SYN-re (bájt-bájtos írás) */
+        {
+            u32 sum = 0;
+            u32 sip = net_self_ip();
+            sum += (sip >> 16) & 0xFFFF; sum += sip & 0xFFFF;
+            sum += (rip >> 16) & 0xFFFF; sum += rip & 0xFFFF;
+            sum += 6; sum += 24;
+            for (u32 i = 0; i < 24; i += 2) sum += (u16)(((u32)tbuf[i] << 8) | tbuf[i + 1]);
+            while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
+            u16 cs = (u16)(~sum & 0xFFFF);
+            tbuf[16] = (u8)(cs >> 8); tbuf[17] = (u8)cs;
+        }
         if (!net_send_ip(6, rip, tbuf, 24)) return 0;
     }
     u32 until = tick_count() + 40;
@@ -71,6 +96,7 @@ int tcp_connect(tcpconn_t *c, u32 rip, u16 rport) {
 }
 
 /* aktuális vevőablak */
+static void tcp_csum_out(u8 *tcp, u32 tcplen, tcpconn_t *c);
 static u16 rwin(tcpconn_t *c) {
     u32 freeb = c->rcap - c->rlen;
     if (freeb > 0x4000) freeb = 0x4000;
@@ -86,16 +112,45 @@ static void send_ack(tcpconn_t *c, u8 extra, const u8 *data, u32 len) {
     tput_be32(tbuf + 8, c->rcv_nxt);
     tbuf[12] = (u8)(hdr << 2);
     tbuf[13] = TCPF_ACK | extra;
-    *(u16 *)(tbuf + 14) = rwin(c);
-    *(u16 *)(tbuf + 16) = 0; *(u16 *)(tbuf + 18) = 0;
+    {
+        u16 w = rwin(c);
+        tbuf[14] = (u8)(w >> 8); tbuf[15] = (u8)w;      /* hálózati bájtsorrend! */
+    }
+    tbuf[16] = 0; tbuf[17] = 0; tbuf[18] = 0; tbuf[19] = 0;
     for (u32 i = 0; i < len && i < 1400; i++) tbuf[20 + i] = data[i];
+    /* 0.5: VALÓDI TCP-ellenőrző összeg — a slirp/valós stackok eldobják a 0-s csumot */
+    tcp_csum_out(tbuf, (u32)hdr + len, c);
     net_send_ip(6, c->rip, tbuf, hdr + len);
+}
+
+/* 0.5: TCP-fejléc + adat ellenőrző összegének kiszámítása (pszeudo-fejléccsel) */
+static u16 tcp_csum_calc(const u8 *tcp, u32 tcplen, u32 sip, u32 dip) {
+    u32 sum = 0;
+    sum += (sip >> 16) & 0xFFFF; sum += sip & 0xFFFF;
+    sum += (dip >> 16) & 0xFFFF; sum += dip & 0xFFFF;
+    sum += 6; sum += tcplen;
+    for (u32 i = 0; i < tcplen; i += 2) {
+        u16 w = (i + 1 < tcplen) ? (u16)(((u16)tcp[i] << 8) | tcp[i + 1]) : (u16)((u16)tcp[i] << 8);
+        sum += w;
+    }
+    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
+    return (u16)(~sum & 0xFFFF);
+}
+static void tcp_csum_out(u8 *tcp, u32 tcplen, tcpconn_t *c) {
+    tcp[16] = 0; tcp[17] = 0;
+    u32 sip = net_self_ip(), dip = c->rip;
+    u16 cs = tcp_csum_calc(tcp, tcplen, sip, dip);
+    tcp[16] = (u8)(cs >> 8); tcp[17] = (u8)cs;          /* hálózati bájtsorrend! */
 }
 
 void tcp_input(const u8 *pkt, u32 iplen, u32 srcip) {
     const u8 *ip = pkt;
-    u32 tcplen = ((u32)ip[2] << 8) | ip[3];
-    if (tcplen < 20 || tcplen > iplen - 20) return;
+    /* 0.5 javítás: a TCP-szakasz hossza = IP-összhossz − IP-fejléc (20).
+       Korábban az ip[2..3] (IP-összhossz) mezőt olvastuk „tcplen”-ként,
+       amivel a második ellenőrzés MINDEN csomagot eldobott — a 0.4.0-ban ez
+       rejtve maradt, mert a HTTP a wifi demo rádión át ment. */
+    u32 tcplen = iplen - 20;
+    if (tcplen < 20) return;
     const u8 *t = ip + 20;
     u16 sport = (u16)((t[0] << 8) | t[1]);
     u16 dport = (u16)((t[2] << 8) | t[3]);
@@ -145,6 +200,49 @@ void tcp_input(const u8 *pkt, u32 iplen, u32 srcip) {
             c->state = 3;
         }
         return;
+    }
+
+    /* 0.5: figyelő kapcsolatok — SYN-t kapott listen-socketre elfogadjuk */
+    for (int i = 0; i < 3; i++) {
+        tcpconn_t *c = &conns[i];
+        if (!c->used || c->state != 4 || c->lport != dport) continue;
+        if ((flags & TCPF_SYN) && !(flags & TCPF_ACK)) {
+            c->rip = srcip;
+            c->rport = sport;
+            c->rcv_nxt = seq + 1;
+            c->snd_una = c->iss;
+            /* SYN-ACK (iss szekvenciával) — 0.5: ellenőrző összeggel */
+            {
+                static u8 tbuf[1600];
+                tbuf[0] = (u8)(c->lport >> 8); tbuf[1] = (u8)c->lport;
+                tbuf[2] = (u8)(sport >> 8); tbuf[3] = (u8)sport;
+                tput_be32(tbuf + 4, c->iss);
+                tput_be32(tbuf + 8, c->rcv_nxt);
+                tbuf[12] = 0x50;
+                tbuf[13] = TCPF_SYN | TCPF_ACK;
+                {
+                    u16 w = rwin(c);
+                    tbuf[14] = (u8)(w >> 8); tbuf[15] = (u8)w;
+                }
+                tbuf[16] = 0; tbuf[17] = 0; tbuf[18] = 0; tbuf[19] = 0;
+                {
+                    u32 sum = 0;
+                    u32 sip = net_self_ip();
+                    sum += (sip >> 16) & 0xFFFF; sum += sip & 0xFFFF;
+                    sum += (srcip >> 16) & 0xFFFF; sum += srcip & 0xFFFF;
+                    sum += 6; sum += 20;
+                    for (u32 i = 0; i < 20; i += 2) sum += (u16)(((u32)tbuf[i] << 8) | tbuf[i + 1]);
+                    while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
+                    u16 cs = (u16)(~sum & 0xFFFF);
+                    tbuf[16] = (u8)(cs >> 8); tbuf[17] = (u8)cs;
+                }
+                net_send_ip(6, srcip, tbuf, 20);
+            }
+            c->snd_nxt = c->iss + 1;
+            c->state = 2;                    /* egyszerűsített elfogadás */
+            kprintf("tcp: listen-kapcsolat elfogadva (%u -> %u)\n", sport, dport);
+            return;
+        }
     }
 }
 

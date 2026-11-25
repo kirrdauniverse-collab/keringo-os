@@ -52,18 +52,20 @@ static void launch_ball(void) {
     sound_beep(300, 6);
 }
 
-/* ütőgeometria: forgó vonalszakaszok */
-static void flipper_line(int left, float ang, float *x0, float *y0, float *x1, float *y1) {
+/* ütőgeometria: forgó vonalszakaszok — 0.5 átírás
+ * A két ütő SZIMMETRIKUS: forgópontok az asztal alján (cy), nyugalmi szög ~26°
+ * a vízszintes felett, felhajtva ~69°. A bal ütő a jobbra, a jobb balra mutat
+ * — ez az igazi flipper-kinézet (a 0.3-ban a bal ütő lefelé állt!).
+ * press: 0 = nyugalmi, 0.62 = teljes felhajtás */
+static void flipper_line(int left, float press, float *x0, float *y0, float *x1, float *y1) {
     float cx = left ? (float)(PX0 + PX1) / 2 - 92 : (float)(PX0 + PX1) / 2 + 92, cy = 668;
     float len = 78;
-    float a = left ? 0.55f + ang : -0.55f + ang;    /* alap + felhajtás */
-    if (left) a = -0.5f + (-ang) * -1.0f;           /* bal ütő: felfelé nő */
-    /* egyszerűbb: bal ütő szöge -0.5 (nyugalmi) -> +0.5 (felhajtva) */
-    a = left ? (-0.5f - ang * 0.9f) : (0.5f - ang * 0.9f);
-    if (a < -1.2f) a = -1.2f;
-    if (a > 1.2f) a = 1.2f;
+    if (press < 0) press = 0;
+    if (press > 0.62f) press = 0.62f;
+    float a = 0.45f + press * 1.05f;            /* 0.45 rad nyugalom -> 1.1 rad felhajtva */
     *x0 = cx; *y0 = cy;
-    *x1 = cx + kosz_cosf(a) * len * (left ? 1 : -1);
+    if (left) { *x1 = cx + kosz_cosf(a) * len; }
+    else     { *x1 = cx - kosz_cosf(a) * len; }
     *y1 = cy - kosz_sinf(a) * len;
 }
 
@@ -185,9 +187,11 @@ static void pin_phys(void) {
 void pin_key(u8 sc, u8 rel, u8 ascii) {
     (void)ascii;
     int dn = !rel;
-    if (sc == 0x2C || sc == KEY_LEFT)  fl_l = dn;            /* Z / bal nyíl */
-    if (sc == 0x2D || sc == KEY_RIGHT) fl_r = dn;            /* X / jobb nyíl */
+    /* 0.5: több alternatív gomb — Z/X, nyilak, Ctrl/Shift */
+    if (sc == 0x2C || sc == KEY_LEFT  || sc == 0x1D || sc == 0x2A) fl_l = dn;   /* Z / bal / L-Ctrl / bal Shift */
+    if (sc == 0x2D || sc == KEY_RIGHT || sc == 0x36) fl_r = dn;               /* X / jobb / jobb Shift */
     if (sc == KEY_DOWN && dn) { if (!ball_in_play) plunger = plunger < 100 ? plunger + 12 : 100; }
+    if (sc == KEY_UP   && dn) { if (!ball_in_play) launch_ball(); }
     if (sc == KEY_ENTER && dn) launch_ball();
     if (sc == 0x39 && dn) launch_ball();                     /* space */
 }
@@ -204,7 +208,7 @@ void pin_frame(u32 tick) {
     if (pnext_phys < tick - 200) pnext_phys = tick;
 
     /* asztal */
-    gfx_fill_rect(0, 23, 1024, 725, 0xFF0A0D12);
+    gfx_fill_rect(0, 23, gfx_width(), gfx_height() - 44, 0xFF0A0D12);
     gfx_fill_rect(PX0 - 14, PTOP - 14, PX1 - PX0 + 28, PBOT - PTOP + 34, 0xFF131A26);
     gfx_rect(PX0 - 14, PTOP - 14, PX1 - PX0 + 28, PBOT - PTOP + 34, 0xFF2E4A56);
     /* felső ív */
@@ -257,7 +261,7 @@ void pin_frame(u32 tick) {
     if (!ball_in_play) {
         int py = 700 - plunger;
         gfx_fill_rect(PX1 - 6, py, 10, 20, 0xFFE8B24A);
-        gfx_draw_text(PX0 - 12 - gfx_text_width(ui_lang() ? "HOLD DOWN, THEN SPACE" : "TARTSD LENYOMVA, MAJÓ ENTER"), 640, ui_lang() ? "HOLD DOWN, THEN SPACE" : "TARTSD LENYOMVA, MAJÓ ENTER", 0xFF8FA0AC, 0x00000000u);
+        gfx_draw_text(PX0 - 12 - gfx_text_width(ui_lang() ? "HOLD DOWN, THEN SPACE/ENTER" : "NYIL LE, MAJD SPACE/ENTER"), 640, ui_lang() ? "HOLD DOWN, THEN SPACE/ENTER" : "NYIL LE, MAJD SPACE/ENTER", 0xFF8FA0AC, 0x00000000u);
     }
 
     /* labda */
@@ -296,7 +300,7 @@ void pin_frame(u32 tick) {
     }
 
     ksnprintf(b, sizeof(b), "%s",
-              ui_lang() ? "Z/left: left flipper  X/right: right  Down: plunger  Space: launch"
-                        : "Z/bal: bal ütő  X/job: jobb ütő  Le: dugattyú  Space: indítás");
+              ui_lang() ? "Z/Left/Shift: left flipper  X/Right: right  Down: plunger  Space/Up: launch"
+                        : "Z/bal/Shift: bal ütő  X/jobb: jobb ütő  Le: dugattyú  Space/Fel: indítás");
     app_chrome(ui_lang() ? "Space Cadet Pinball (Win95-hommage)" : "Űrkadét Flipper (Win95-hommage)", b, accent);
 }

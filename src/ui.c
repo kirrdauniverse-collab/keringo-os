@@ -35,6 +35,13 @@ static int selected = 0;
 static float view_blend = 0;
 static float view_target = 0;
 
+/* 0.5 „elkapás”-javítások:
+ * - orbit_hold: P billentyűvel a keringés megállítható (a panelek helyben maradnak)
+ * - speed_cur: ha az egér egy panel közelébe ér, az lelassul („mágneses panelek”) */
+static int   orbit_hold = 0;
+static float speed_cur[PANEL_N];
+static u32   panel_near = 0;     /* tick: utoljára volt-e egér panel mellett */
+
 /* színek */
 #define C_BG       0xFF10151A
 #define C_PANEL    0xE61C2530
@@ -92,8 +99,8 @@ static const u8 cursor_bmp[12] = {
 /* ---------- szövegek ---------- */
 static const char *TITLE[] = { "KERINGŐ " KERINGO_VERZIO, "ORBIT " KERINGO_VERZIO };
 static const char *HINT_GAL[] = {
-    "Nyilak: forgatás  +/‑: zoom  Enter: belépés  Tab: következő  F1: nyelv",
-    "Arrows: rotate  +/-: zoom  Enter: enter  Tab: next  F1: language" };
+    "Nyilak: forgatás  +/‑: zoom  Enter: belépés  Tab: következő  P: keringés állít  F1: nyelv",
+    "Arrows: rotate  +/-: zoom  Enter: enter  Tab: next  P: pause orbits  F1: language" };
 static const char *HINT_JEGY[] = {
     "ÍRJ! Backspace töröl, F2 = mentés, Esc = vissza",
     "TYPE! Backspace erases, F2 = save, Esc = back" };
@@ -789,6 +796,12 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
         return;
     }
     /* ---- galaxis-nézet ---- */
+    /* 0.5: P = panelek megállítása/indítása (könnyebb elkapás) */
+    if (ascii == 'p' || ascii == 'P') {
+        orbit_hold ^= 1;
+        sound_beep(orbit_hold ? 300 : 600, 4);
+        return;
+    }
     /* számjegy: alkalmazás indítása (1-9) */
     if (ascii >= '1' && ascii <= '9') {
         int idx = ascii - '1';
@@ -845,8 +858,8 @@ void ui_handle_mouse(int dx, int dy, u8 btn) {
                 float pz = r * kosz_sinf(p->angle);
                 float py = p->y + 18.0f * kosz_sinf((float)(tick_count() % 600) / 95.7f + p->bob);
                 if (!r3d_project_point(px, py, pz, &sx, &sy, &d)) continue;
-                float half = 240.0f * r3d_focal() / d * 0.5f;
-                float halfy = 160.0f * r3d_focal() / d * 0.5f;
+                float half = 240.0f * r3d_focal() / d * 0.5f + 18.0f;   /* 0.5: nagyobb kattintási tűrés */
+                float halfy = 160.0f * r3d_focal() / d * 0.5f + 18.0f;
                 float ddx = (float)mx - sx, ddy = (float)my - sy;
                 if (ddx > -half && ddx < half && ddy > -halfy && ddy < halfy) {
                     if (d < best) { best = d; hit = i; }
@@ -869,14 +882,32 @@ void ui_handle_mouse(int dx, int dy, u8 btn) {
 static void update_panels(u32 tick) {
     for (int i = 0; i < PANEL_N; i++) {
         panel_t *p = &panels[i];
-        p->angle += p->speed;
+        float target = 1;
+        if (orbit_hold) {
+            target = 0;                          /* P: keringés megállítva */
+        } else {
+            /* mágneses panelek: ha az egér a panel közelében van, az megáll */
+            float r = p->base_r * (1.0f - 0.3f * p->grav);
+            float px = r * kosz_cosf(p->angle);
+            float pz = r * kosz_sinf(p->angle);
+            float py = p->y + 18.0f * kosz_sinf((float)(tick % 600) / 95.7f + p->bob);
+            float sx, sy, d;
+            if (r3d_project_point(px, py, pz, &sx, &sy, &d)) {
+                float ddx = (float)mx - sx, ddy = (float)my - sy;
+                float half  = 240.0f * r3d_focal() / d * 0.5f + 26;
+                float halfy = 160.0f * r3d_focal() / d * 0.5f + 26;
+                if (ddx > -half && ddx < half && ddy > -halfy && ddy < halfy) target = 0;
+            }
+        }
+        speed_cur[i] += (target - speed_cur[i]) * 0.18f;
+        p->angle += p->speed * speed_cur[i];
         if (p->angle > PI2) p->angle -= PI2;
         u32 age = tick - p->last_focus;
         float fresh = 0;
         if (age < 3000) fresh = 0.5f * (1.0f - (float)age / 3000.0f);
-        float target = 0.25f * (p->focus_count > 4 ? 4 : p->focus_count) / 4.0f + fresh;
-        if (target > 1) target = 1;
-        p->grav += (target - p->grav) * 0.01f;
+        float tgt = 0.25f * (p->focus_count > 4 ? 4 : p->focus_count) / 4.0f + fresh;
+        if (tgt > 1) tgt = 1;
+        p->grav += (tgt - p->grav) * 0.01f;
     }
 }
 
@@ -904,6 +935,10 @@ static void draw_hud(u32 tick) {
     /* alsó sáv */
     gfx_fill_rect(0, gfx_height() - 18, gfx_width(), 18, 0xE6151B22);
     gfx_fill_rect(0, gfx_height() - 19, gfx_width(), 1, C_BORDER);
+    if (orbit_hold && focus_panel < 0) {
+        if ((tick / 25) % 2 == 0)
+            gfx_draw_text(gfx_width() / 2 - 7 * 8, 6, lang ? "[ORBITS PAUSED]" : "[KERINGÉS ÁLL]", 0xFF50E878, 0xFF000000u);
+    }
     const char *h = HINT_GAL[lang];
     if (url_edit) h = lang ? "URL: Enter = mehet, Esc = mégse" : "URL: Enter = go, Esc = cancel";
     else if (focus_panel == P_JEGYZET) h = HINT_JEGY[lang];
@@ -959,6 +994,7 @@ void ui_init(void) {
         panels[i].icon = ikonok[i];
         panels[i].angle = (float)i * PI2 / (float)PANEL_N + 0.35f;
         panels[i].speed = 0.0011f + 0.0004f * (float)((i * 7) % 3);
+        speed_cur[i] = 1;
         panels[i].grav = 0;
         panels[i].last_focus = 0;
         panels[i].focus_count = 0;

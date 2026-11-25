@@ -54,6 +54,7 @@ typedef struct {
 } tcpconn_t;
 
 int  tcp_connect(tcpconn_t *c, u32 rip, u16 rport);
+int  tcp_listen(tcpconn_t *c, u16 port);     /* 0.5 Távvezérlő: figyelő socket */
 int  tcp_send(tcpconn_t *c, const u8 *data, u32 len);
 int  tcp_wait_data(tcpconn_t *c, u32 timeout_ms);
 void tcp_close(tcpconn_t *c);

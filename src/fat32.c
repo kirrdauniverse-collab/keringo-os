@@ -464,3 +464,140 @@ int fat32_write(fatfs_t *fs, const char *path, const u8 *buf, u32 len) {
 }
 
 int fat32_flush(fatfs_t *fs) { (void)fs; return 1; }
+
+/* ================= 0.5: formázás, törlés, átnevezés ================= */
+
+/* --- FAT32 formázás egy (partíció)blokkeszközre.
+ * Layout: 512 b/szektor, klaszterméret úgy választva, hogy >= 65525 klaszter legyen
+ * (a FAT32 szabvány és a fat32_mount feltétele), rsvd=32, 2 FAT, gyökér a 2-es klaszter. */
+int fat32_format(blkdev_t *bd, const char *label) {
+    if (!bd || bd->nsecs < 70000) { kprintf("fat32f: kicsi a terulet (%u szektor)\n", bd ? bd->nsecs : 0); return 0; }
+
+    u32 spc = 1;
+    while (bd->nsecs / spc >= 140000 && spc < 8) spc <<= 1;    /* max ~2 KB klaszter */
+    while (bd->nsecs / spc < 65525 && spc < 16) spc <<= 1;      /* FAT32 min klaszterszam */
+    if (bd->nsecs / spc < 65525) { kprintf("fat32f: meg mindig kicsi\n"); return 0; }
+    u32 nclus = bd->nsecs / spc;
+    u32 fatsz = (nclus * 4 + 511) / 512;
+    u32 rsvd = 32, nfats = 2, root_clus = 2;
+    u32 fat0 = rsvd, data0 = rsvd + nfats * fatsz;
+    u32 totsec = bd->nsecs;
+
+    /* --- boot-szektor --- */
+    static u8 bs[512];
+    for (int i = 0; i < 512; i++) bs[i] = 0;
+    bs[0] = 0xEB; bs[1] = 0x58; bs[2] = 0x90;
+    for (int i = 0; i < 8 && "KERINGO05"[i]; i++) bs[3 + i] = "KERINGO05"[i];
+    bs[11] = 512 & 255; bs[12] = 512 >> 8;      /* bps */
+    bs[13] = (u8)spc;
+    bs[14] = (u8)(rsvd & 255); bs[15] = (u8)(rsvd >> 8);
+    bs[16] = (u8)nfats;
+    bs[17] = 0; bs[18] = 0;                      /* rootent = 0 */
+    bs[19] = 0; bs[20] = 0;                      /* totsec16 = 0 */
+    bs[21] = 0xF8;                                /* merevlemez-media */
+    bs[22] = 0; bs[23] = 0;                      /* fatsz16 = 0 */
+    bs[24] = 63; bs[25] = 0; bs[26] = 255; bs[27] = 0;   /* CHS: 63 szektor/nyom, 255 fej */
+    bs[28] = 0; bs[29] = 0;                      /* hidden */
+    bs[32] = (u8)totsec; bs[33] = (u8)(totsec >> 8); bs[34] = (u8)(totsec >> 16); bs[35] = (u8)(totsec >> 24);
+    bs[36] = (u8)(fatsz & 255); bs[37] = (u8)(fatsz >> 8); bs[38] = (u8)(fatsz >> 16); bs[39] = (u8)(fatsz >> 24);
+    bs[40] = (u8)0; bs[41] = (u8)0;              /* ext flags */
+    bs[42] = 0; bs[43] = 0;                       /* fsver */
+    bs[44] = (u8)root_clus; bs[45] = (u8)(root_clus >> 8); bs[46] = 0; bs[47] = 0;
+    bs[48] = 1; bs[49] = 0;                       /* FSInfo szektor */
+    bs[50] = 6; bs[51] = 0;                       /* backup boot */
+    bs[510] = 0x55; bs[511] = 0xAA;
+    /* adatok a BPB végén */
+    bs[64] = 0x80;                                /* meghajtószám */
+    bs[66] = 0x29;                                /* kiterjesztett aláírás */
+    u32 volid = tick_count() * 305419896u;
+    bs[67] = (u8)volid; bs[68] = (u8)(volid >> 8); bs[69] = (u8)(volid >> 16); bs[70] = (u8)(volid >> 24);
+    for (int i = 0; i < 11; i++) bs[71 + i] = ' ';
+    for (int i = 0; i < 11 && label[i]; i++) bs[71 + i] = (u8)(label[i] >= 'a' && label[i] <= 'z' ? label[i] - 32 : label[i]);
+    for (int i = 0; i < 8 && "FAT32   "[i]; i++) bs[82 + i] = "FAT32   "[i];
+    if (!bd->write_secs(bd->start_lba, 1, bs, bd->ctx)) return 0;
+
+    /* --- FSInfo --- */
+    static u8 fi[512];
+    for (int i = 0; i < 512; i++) fi[i] = 0;
+    fi[0]='R'; fi[1]='R'; fi[2]='a'; fi[3]='A';              /* vezér-aláírás */
+    fi[484]='r'; fi[485]='r'; fi[486]='A'; fi[487]='A';     /* struktúra-aláírás */
+    *(u32 *)(fi + 488) = nclus - 3;              /* szabad klaszterek (3 foglalt) */
+    *(u32 *)(fi + 492) = 3;                       /* következő szabad */
+    fi[510] = 0x55; fi[511] = 0xAA;
+    if (!bd->write_secs(bd->start_lba + 1, 1, fi, bd->ctx)) return 0;
+
+    /* --- FAT[0..1] (mindkét példány) --- */
+    static u8 fsec[512];
+    for (int i = 0; i < 512; i++) fsec[i] = 0;
+    fsec[0] = 0xF8; fsec[1] = 0xFF; fsec[2] = 0xFF; fsec[3] = 0x0F;   /* 0. bejegyzés */
+    fsec[4] = 0xFF; fsec[5] = 0xFF; fsec[6] = 0xFF; fsec[7] = 0x0F;   /* 1. bejegyzés */
+    fsec[8] = 0xF8; fsec[9] = 0xFF; fsec[10] = 0xFF; fsec[11] = 0x0F; /* 2. = gyökér EOC */
+    for (u32 f = 0; f < nfats; f++)
+        for (u32 s = 0; s < fatsz; s++) {
+            if (s == 0) { if (!bd->write_secs(bd->start_lba + fat0 + f * fatsz + s, 1, fsec, bd->ctx)) return 0; }
+            else {
+                static u8 zer[512];
+                if (!bd->write_secs(bd->start_lba + fat0 + f * fatsz + s, 1, zer, bd->ctx)) return 0;
+            }
+        }
+
+    /* --- gyökérkönyvtár első szektora: kötetfelirat --- */
+    static u8 root[512];
+    for (int i = 0; i < 512; i++) root[i] = 0;
+    for (int i = 0; i < 11 && label[i]; i++) root[i] = (u8)(label[i] >= 'a' && label[i] <= 'z' ? label[i] - 32 : label[i]);
+    root[11] = 0x08;                             /* ATTR_VOLUME_ID */
+    if (!bd->write_secs(bd->start_lba + data0, 1, root, bd->ctx)) return 0;
+    kprintf("fat32f: OK — %u klaszter, spc=%u, fatsz=%u\n", nclus, spc, fatsz);
+    return 1;
+}
+
+/* --- fájl törlése (könyvtárbejegyzés 0xE5 + klaszterlánc felszabadítása) --- */
+int fat32_delete(fatfs_t *fs, const char *path) {
+    char last[16];
+    u32 dir_clus;
+    if (resolve_dir(fs, path, last, &dir_clus) < 0 || !last[0]) return 0;
+    u32 dbn;
+    if (!read_dir_buf(fs, dir_clus, dirbuf_b, &dbn)) return 0;
+    u32 first; u8 attr;
+    int off = dir_find(dirbuf_b, dbn, last, &first, 0, &attr);
+    if (off < 0) return 0;
+    if (attr & 0x10) return 0;                    /* könyvtár törlése most nem */
+    /* lánc felszabadítása */
+    u32 c = first;
+    while (c >= 2 && c < 0x0FFFFFF8) {
+        u32 nx = fat_get(fs, c);
+        fat_set(fs, c, 0);
+        c = nx;
+    }
+    /* bejegyzés törlése */
+    dirbuf_b[off] = 0xE5;
+    if (!write_dir_sec(fs, dir_clus, (u32)off / fs->bps, dbn)) return 0;
+    return 1;
+}
+
+/* --- átnevezés (8.3 mező újraírása) --- */
+int fat32_rename(fatfs_t *fs, const char *path, const char *newname) {
+    char last[16];
+    u32 dir_clus;
+    if (resolve_dir(fs, path, last, &dir_clus) < 0 || !last[0]) return 0;
+    u32 dbn;
+    if (!read_dir_buf(fs, dir_clus, dirbuf_b, &dbn)) return 0;
+    u32 first; u8 attr;
+    int off = dir_find(dirbuf_b, dbn, last, &first, 0, &attr);
+    if (off < 0) return 0;
+    u8 *e = dirbuf_b + off;
+    char base[9]; char ext[4];
+    int bi = 0, ei = 0, dot = -1;
+    for (int i = 0; newname[i]; i++) if (newname[i] == '.') dot = i;
+    if (dot < 0) { for (int i = 0; newname[i] && bi < 8; i++) base[bi++] = newname[i]; }
+    else {
+        for (int i = 0; i < dot && bi < 8; i++) base[bi++] = newname[i];
+        for (int i = dot + 1; newname[i] && ei < 3; i++) ext[ei++] = newname[i];
+    }
+    for (int i = bi; i < 8; i++) base[i] = ' ';
+    for (int i = ei; i < 3; i++) ext[i] = ' ';
+    for (int i = 0; i < 8; i++) e[i] = (u8)((base[i] >= 'a' && base[i] <= 'z') ? base[i] - 32 : base[i]);
+    for (int i = 0; i < 3; i++) e[8 + i] = (u8)((ext[i] >= 'a' && ext[i] <= 'z') ? ext[i] - 32 : ext[i]);
+    if (!write_dir_sec(fs, dir_clus, (u32)off / fs->bps, dbn)) return 0;
+    return 1;
+}

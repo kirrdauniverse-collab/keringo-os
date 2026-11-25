@@ -1,5 +1,65 @@
 # Keringő OS — Változásjegyzék
 
+## 0.5.0 — „Műhely" (2026-11-25)
+
+A felhasználói hibajelentésekre épülő javító- és bővítőkiadás: 5 új alkalmazás,
+3 sürgős hibajavítás, monitor-biztos boot, és a bejelentett irányító-eszközök.
+
+- **QUARTZ-4B (KIMI-MATE)**: a repóba feltöltött 4 bites gép teljes Keringő-portja —
+  16 utasításos CPU, 4096 nibble RAM, szöveges (32×16) és grafikus (64×48) mód,
+  teljes BASIC (PRINT @, PLOT/LINE/BOX/CIRCLE/TRIANGLE/FILL, IF/FOR/WHILE/GOSUB,
+  PEEK/POKE, fájlkezelés). Saját szerkesztő bal/jobb kurzorral és
+  parancs-előzményekkel (Fel/Le — pont, amit a HTML-verzióban hiányoltál!).
+  Beépített játékok: PONG, METEOR, KÍGYÓ + DEMO/FILL/HELLO. A `KEY()` bővítéssel
+  a nyilak játékvezérlésre is szolgálnak; F1 súgó, F5 gépi kód hex-betöltő.
+- **Partíciókezelő**: MBR-tábla listázása, FAT32-partíció létrehozása (N),
+  törlése (D), aktív jelző (A), FAT32-formázás (F) — mindegyik Y-megerősítéssel.
+- **Telepítő**: más oprendszerek MELLÉ telepít (Linux Lite / GRUB-mellett):
+  FAT32-re formáz, majd a kernelt és az adatfájlokat kimásolja, jelölőt ír,
+  és GRUB_UTASITAS.TXT-t generál a Linux oldali beállításhoz.
+- **Keringő Commander**: duplapaneles fájlkezelő (/cd, /mem, /sys, /usb) —
+  másolás (F5), átnevezés (F6), törlés (F8), archiválás/kicsomagolás (.KPA,
+  RLE, F7), és hex/dec/bin/karakter nézőke SZEKRESZTŐVEL (F3) + szövegszerkesztő (F4).
+- **Távvezérlő (KRVP1)**: két Keringő gép közt — a kiszolgáló megosztja a
+  képernyőjét (32×32-as csempék RLE-tömörítéssel) és a távoli billentyűzet/egér
+  eseményeit a saját asztalába injektálja; fájlok is átvihetők (GET/PUT).
+  QEMU-ban TCP 7331-en; a host↔vendég útvonal teljes, a vendég↔vendég
+  kettős-NAT útvonalon a kézfogás megy, a stream lassabban (0.6-ban javítjuk).
+- **FAT32-bővítések**: formázás (fat32_format), törlés, átnevezés.
+- **ZX81**: Z80-mag a DD/FD (IX/IY) prefixekkel; a valódi 8 KB-os ROM a
+  lemezről automatikusan betöltődik (adatok/ZX81.ROM), display-file renderelés
+  saját karakterkészlettel. A ROM NEM érkezett meg a repóba — töltsd fel, és
+  azonnal él az útvonal.
+- **Monitor-biztos boot**: a multiboot-fejléc most 640×480×32-t kér (a régi
+  CRT monitorok miatt!), a GRUB-menüben 1024×768 / 1280×800 is választható,
+  grafikai hiba esetén pedig magyar VGA-szöveges üzenet jelenik meg.
+- **Képernyővédők**: +2 (Meteorok, Tábortűz) — összesen 7.
+
+**Hibajavítások (a bejelentéseidre):**
+1. **Festő**: az eszköztár, a paletta (24 szín) és az ecsetméret most KATTINTHATÓ —
+   korábban se szín, se alakzat nem választható, csak borostyán ceruzával lehetett
+   rajzolni (a kattintásokat senki nem kezelte!). [+]: a gombok rajzolva is vannak.
+2. **Űrkadét Flipper**: az ütők szimmetrikus geometriája (a bal ütő lefelé állt —
+   ez volt az „oldalt vannak a golyó ütői"), plusz több gomb (Z/X, nyilak,
+   Ctrl/Shift) és nyílfel-le indítás. Gombok: kiterjedtebb súgó.
+3. **A keringő ablakok (panelek)**: „P" = keringés megállítása (a panelek
+   helyben maradnak — végre elérhetők!), egér-közeledésre a panel lelassul
+   („mágneses panelek"), és a kattintási tűréshatár is nőtt (+36 px).
+
+**Mélyebb javítások, amelyeket a fentiek ástak elő:**
+- **PS/2 AUX-elválasztás**: a billentyűzet-IRQ elolvasta az egér bájtjait és
+  fordítva (a 8042 kimeneti puffere közös) — megtörténtek billentyűvesztések.
+  Most mindkét kezelő ellenőrzi a státusz-AUX bitet.
+- **TCP**: (a) a `tcplen`-et az IP-összhossz-mezőből olvastuk — a második
+  ellenőrzés minden bejövő TCP-csomagot eldobott (eddig rejtve, mert a HTTP
+  a demo rádión át ment); (b) valódi TCP-ellenőrző összeg + hálózati bájtsorrend
+  az ablak/összeg mezőknél (a korábbi kis-endian írásokat a valós stackok eldobják).
+- **Multiboot-info**: a framebuffer_bpp BÁJT (nem u32) — az ellenőrzés most helyes.
+
+Megjegyzések: ext2/NTFS-olvasás még nincs (FAT32 olvasás+írás van) — a 0.6-os
+tervben szerepel; a QUARTZ-4B-ben a kifejezések teljes értéken értékelődnek
+(a 4 bites maszk a változóknál él) — ld. az F1 súgót.
+
 ## 0.4.0 — „Wi-Fi" (2026-11-16)
 
 - **Wi-Fi alrendszer nulláról**: 802.11g STA (szken 1/6/11, auth/assoc),

@@ -57,6 +57,10 @@ static void push_key(u8 sc, u8 rel, u8 ascii) {
 }
 
 static void kbd_irq(void) {
+    u8 st = inb(STAT);
+    if (st & 0x20) return;              /* AUX: egér-adat a pufferben — NEM billentyű!
+                                              (0.5 javítás: korábban a kbd_irq elolvasta
+                                               az egér bájtjait, és a billentyűk elvesztek) */
     u8 sc = inb(DATA);
     if (sc == 0xE0) return;        /* E0 előtag: a következő kódot külön értelmezzük */
     if (sc & 0x80) {
@@ -99,6 +103,8 @@ static void kbd_irq(void) {
 }
 
 static void mouse_irq(void) {
+    u8 st = inb(STAT);
+    if (!(st & 0x20)) return;            /* nem AUX-adat — billentyű, nem eszi meg! */
     u8 v = inb(DATA);
     switch (mouse_cycle) {
         case 0:
@@ -142,9 +148,24 @@ int key_pop(key_event_t *out) {
     *out = keyq[keyh]; keyh = (keyh + 1) & 31; return 1;
 }
 
+/* 0.5 Távvezérlő: mesterséges billentyű-esemény a sorba (távoliirányításhoz) */
+void ps2_inject_key(u8 sc, u8 rel, u8 ascii) {
+    push_key(sc, rel, ascii);
+}
+
 int mouse_pop(mouse_event_t *out) {
     if (mh == mt) return 0;
     *out = mouseq[mh]; mh = (mh + 1) & 31; return 1;
+}
+
+/* 0.5 Távvezérlő: mesterséges egér-esemény (távoliirányításhoz) */
+void ps2_inject_mouse(s32 dx, s32 dy, u8 btn) {
+    mbtn = btn;
+    int nt = (mt + 1) & 31;
+    if (nt != mh) {
+        mouseq[mt].dx = dx; mouseq[mt].dy = -dy; mouseq[mt].buttons = mbtn;
+        mt = nt;
+    }
 }
 
 u8 mouse_buttons(void) { return mbtn; }

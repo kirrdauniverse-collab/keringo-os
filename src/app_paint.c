@@ -175,6 +175,37 @@ void paint_key(u8 sc, u8 rel, u8 ascii) {
 void paint_mouse(int mx, int my, int dx, int dy, u8 btn, u8 prev) {
     (void)dx; (void)dy;
     if (!(btn & 1) && (prev & 1)) dragging = 0;                 /* gomb fel */
+
+    /* 0.5: UI-kattintások — eszköztár, paletta, ecsetméret (a vászon ELŐTT) */
+    if (btn & 1 && !(prev & 1)) {
+        /* eszközgombok (2 oszlop x 4 sor, 40x40) */
+        for (int t = 0; t < 8; t++) {
+            int bx = 4 + (t & 1) * 44, by = 30 + (t >> 1) * 44;
+            if (app_in_rect(mx, my, bx, by, 40, 40)) {
+                tool = t;
+                sound_beep(700, 3);
+                return;
+            }
+        }
+        /* paletta (4 oszlop x 6 sor, 19x19) */
+        int py = 30 + 4 * 44 + 10;
+        for (int i = 0; i < 24; i++) {
+            int bx = 4 + (i & 3) * 21;
+            int byy = py + (i >> 2) * 21;
+            if (app_in_rect(mx, my, bx - 1, byy - 1, 21, 21)) {
+                col_idx = i;
+                sound_beep(900, 3);
+                return;
+            }
+        }
+        /* ecsetméret: -/+ gombok a jelenlegi szín alatt */
+        int sy = py + 6 * 21 + 8;
+        if (app_in_rect(mx, my, 4, sy + 34, 38, 24))  { if (brush > 1)  brush--; sound_beep(500, 3); return; }
+        if (app_in_rect(mx, my, 46, sy + 34, 38, 24))  { if (brush < 16) brush++; sound_beep(600, 3); return; }
+        /* radír-kör: jobb alsó UI sarok — ecset visszaállítása 2-re */
+        if (app_in_rect(mx, my, 4, sy + 60, 80, 22)) { brush = 2; sound_beep(400, 3); return; }
+    }
+
     if (btn & 2 && !(prev & 2)) {                               /* jobb gomb: színpipa */
         int x = mx - CX, y = my - CY;
         if (x >= 0 && y >= 0 && x < CW && y < CH) {
@@ -290,6 +321,10 @@ void paint_frame(u32 tick) {
     gfx_fill_rect(4, sy, 80, 26, pal[col_idx]);
     gfx_rect(4, sy, 80, 26, 0xFF3A5562);
     gfx_fill_rect(4 + 80 / 2 - brush, sy + 34, brush * 2, brush * 2, pal[col_idx]);
+    /* ecsetméret -/+ gombjai (kattinthatók) */
+    app_button(4,  sy + 34, 38, 24, "-", accent, 0);
+    app_button(46, sy + 34, 38, 24, "+", accent, 0);
+    app_button(4,  sy + 60, 80, 22, ui_lang() ? "brush=2" : "ecset=2", accent, 0);
 
     /* keret + állapotsor */
     gfx_fill_rect(0, 22, (int)gfx_width(), 1, accent);

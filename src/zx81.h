@@ -5,5 +5,6 @@ typedef struct z80{u8 a,f,b,c,d,e,h,l,a2,f2,b2,c2,d2,e2,h2,l2,i,r,im,iff1,iff2,h
 typedef struct{z80_t cpu;u8 mem[16384];u8 key[8];u8 running;u8 border;u32 frames;}zx81_t;
 void z80_init(z80_t*);void z80_step(z80_t*);
 void zx81_init(zx81_t*);void zx81_reset(zx81_t*);void zx81_frame(zx81_t*);void zx81_key(zx81_t*,u8,u8,u8);void zx81_draw(zx81_t*);int zx81_load(zx81_t*,const u8*,u32);
+int zx81_rom_valid(void);int zx81_load_rom_from_storage(zx81_t*);void zx81_rom_unload(void);
 void zx81_app_enter(void);void zx81_app_frame(u32);void zx81_app_key(u8,u8,u8);void zx81_app_exit(void);
 #endif

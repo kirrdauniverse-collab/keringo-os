@@ -5,13 +5,13 @@
 static int saver_cur = -1;         /* -1: nem fut */
 static u32 saver_last = 0;
 
-int saver_count(void) { return 5; }
+int saver_count(void) { return 7; }
 const char *saver_name(int i, int lang) {
-    static const char *n[2][5] = {
-        { "Csillagmező", "Plazma", "Keringés", "Mátrix eső", "Pattogó logó" },
-        { "Starfield", "Plasma", "Orbits", "Matrix rain", "Bouncing logo" }
+    static const char *n[2][7] = {
+        { "Csillagmező", "Plazma", "Keringés", "Mátrix eső", "Pattogó logó", "Meteorok", "Tábortűz" },
+        { "Starfield", "Plasma", "Orbits", "Matrix rain", "Bouncing logo", "Meteors", "Campfire" }
     };
-    return n[lang & 1][i % 5];
+    return n[lang & 1][i % 7];
 }
 
 /* ---------- 1. csillagmező ---------- */
@@ -188,13 +188,77 @@ static void bounce_frame(u32 tick) {
     if (by + lh > H) { by = (float)H - lh; bvy = -bvy; bcolor = (bcolor + 1) % 6; sound_beep(700, 2); }
     gfx_fill_rect(0, 0, W, H, 0xFF07090E);
     gfx_draw_text_scaled((int)bx, (int)by, "KERINGŐ", pal[bcolor], 2);
-    gfx_draw_text_scaled((int)bx + 4, (int)by + 20, "0.3", pal[(bcolor + 3) % 6], 1);
+    gfx_draw_text_scaled((int)bx + 4, (int)by + 20, "0.5", pal[(bcolor + 3) % 6], 1);
+}
+
+/* ---------- 6. meteorok (0.5) ---------- */
+#define MET_MAX 40
+static int met_x[MET_MAX], met_y[MET_MAX], met_v[MET_MAX];
+static int met_tail[MET_MAX][10][2];
+static void meteors_init(void) {
+    for (int i = 0; i < MET_MAX; i++) {
+        met_x[i] = (int)(app_rand() % gfx_width());
+        met_y[i] = -(int)(app_rand() % 200);
+        met_v[i] = 2 + (int)(app_rand() % 6);
+        for (int k = 0; k < 10; k++) { met_tail[i][k][0] = met_x[i]; met_tail[i][k][1] = met_y[i]; }
+    }
+}
+static void meteors_frame(u32 tick) {
+    (void)tick;
+    int W = (int)gfx_width(), H = (int)gfx_height();
+    /* éjszakai ég halvány csillagokkal */
+    gfx_clear(0xFF060A12);
+    for (int y = 0; y < H; y += 2)
+        for (int x = 0; x < W; x += 2)
+            if (((x * 7 + y * 3) & 63) == 0) gfx_pixel(x, y, 0x33FFFFFF);
+    for (int i = 0; i < MET_MAX; i++) {
+        met_x[i] += met_v[i];
+        met_y[i] += met_v[i] / 2 + 1;
+        if (met_y[i] > H || met_x[i] > W) {
+            met_x[i] = (int)(app_rand() % gfx_width()) - 200;
+            met_y[i] = -(int)(app_rand() % 100);
+        }
+        for (int k = 9; k > 0; k--) { met_tail[i][k][0] = met_tail[i][k-1][0]; met_tail[i][k][1] = met_tail[i][k-1][1]; }
+        met_tail[i][0][0] = met_x[i]; met_tail[i][0][1] = met_y[i];
+        for (int k = 0; k < 10; k++) {
+            u32 c = k == 0 ? 0xFFFFFFFF : (k < 4 ? 0xFFE8B24A : 0x55D8E0E8);
+            gfx_pixel(met_tail[i][k][0], met_tail[i][k][1], c);
+            gfx_pixel(met_tail[i][k][0] + 1, met_tail[i][k][1], c);
+        }
+    }
+}
+
+/* ---------- 7. tábortűz (0.5) ---------- */
+static void fire_frame(u32 tick) {
+    int W = (int)gfx_width(), H = (int)gfx_height();
+    static u8 heat[1024];
+    if (tick % 2 == 0) {
+        for (int x = 0; x < W && x < 1024; x++)
+            heat[x] = (u8)(x > W / 2 - 90 && x < W / 2 + 90
+                            ? 160 + (app_rand() % 90) : (app_rand() % 20));
+    }
+    /* minden sor a lelő parazsból halványul felfelé */
+    for (int y = 0; y < H - 30; y++) {
+        int hr = (H - 30 - y) * 30 / (H - 30);        /* hő-sűrűség sor szerint */
+        for (int x = 1; x < W - 1; x++) {
+            int h = heat[x] - hr - (int)(app_rand() % 8);
+            if (h < 0) h = 0;
+            u32 c;
+            if (h > 200)      c = 0xFFFFE8B0;
+            else if (h > 150) c = 0xFFF0A020;
+            else if (h > 100) c = 0xFFE86010;
+            else if (h > 60)  c = 0xFFC03010;
+            else if (h > 25)  c = 0xFF6E1A0A;
+            else              c = 0xFF0D0605;
+            gfx_pixel(x, H - 1 - y, c);
+        }
+    }
 }
 
 /* ---------- API ---------- */
 void saver_start(int which) {
-    if (which < 0) which = (int)(app_rand() % 5);
-    saver_cur = which % 5;
+    if (which < 0) which = (int)(app_rand() % 7);
+    saver_cur = which % 7;
     app_srand(tick_count() ^ 0x5A5A0000u);
     switch (saver_cur) {
         case 0: starfield_init(); break;
@@ -202,6 +266,8 @@ void saver_start(int which) {
         case 2: orbits_init(); break;
         case 3: matrix_init(); break;
         case 4: bounce_init(); break;
+        case 5: meteors_init(); break;
+        case 6: break;                      /* tábortűz: nincs init */
     }
     saver_last = tick_count();
     kprintf("saver: %s elindult\n", saver_name(saver_cur, 0));
@@ -220,6 +286,8 @@ void saver_frame(u32 tick) {
         case 2: orbits_frame(tick); break;
         case 3: matrix_frame(tick); break;
         case 4: bounce_frame(tick); break;
+        case 5: meteors_frame(tick); break;
+        case 6: fire_frame(tick); break;
     }
 }
 

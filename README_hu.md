@@ -1,4 +1,4 @@
-# Keringő OS 0.4.0 — „Wi-Fi"
+# Keringő OS 0.5.0 — „Műhely”
 
 **Saját kernel. Saját grafika. Saját ötlet.** Nem Linux, nem fork — nulláról
 írt, csupasz fém i386 operációs rendszer, magyar identitással.
@@ -10,15 +10,16 @@ A panelek pályákon **keringenek** a rendszer magja (a „nap") körül. A trü
 **befelé kering** (közelebb a maghoz), amit nem használsz, az kifelé sodródik.
 Az asztal magától átrendeződik a szokásaid szerint — ilyet még nem látott senki.
 
-## Mit tud a 0.3.0?
+## Mit tud a 0.5.0?
 
 | Réteg | Képesség |
 |---|---|
 | Kernel | GDT/IDT, PIC remap, PIT 100 Hz, **preemptív többfeladat** (round-robin, IRQ0), 4 KB-os lapozás + MMIO-térképezés, bump-heap, **PC-hangszóró** (PIT 2. csatorna) |
 | Eszközök | PS/2 billentyűzet + **egér (javított sorkezeléssel!)**, ATAPI CD, ATA merevlemez, **USB pendrájv (UHCI/EHCI, FAT32 olvasás+írás)**, **PCI**, **hálózat: e1000/RTL8139 + DHCP/TCP/UDP/DNS/HTTP** |
 | **Wi-Fi (0.4)** | **Atheros AR9285 (PCIe) meghajtó** — 2.4 GHz, HT20, legacy sebességek; **802.11g STA** (szken, auth/assoc); **WPA2-PSK**: PBKDF2-SHA1 PMK, PRF PTK, 4-way EAPOL, **CCMP** (saját SHA1/HMAC/AES); **Wi-Fi panel (F6)**; QEMU-hoz **demo rádió** (virtuális AP-k valódi kriptóval) |
-| Fájlrendszer | ISO9660 (`/cd`), RAMFS (`/mem`), **FAT32** (`/sys` HDD-n, `/usb` pendrájvon), partíció-szkenner (MBR + logikai lánc) |
-| Grafika | VBE lineáris framebuffer (a gép által felajánlott módban, pl. 1024×768 vagy 1280×800×32), dupla puffer, saját 8×8 font **magyar ékezetekkel** (ő ű ű Ű kézi bitkép), saját 3D vetítő, textúrázott keringő panelek, **raycaster** (texturált falak + sprite-billboardok) |
+| Fájlrendszer | ISO9660 (`/cd`), RAMFS (`/mem`), **FAT32 olvasás+ÍRÁS** (`/sys` HDD, `/usb` pendrájv; 0.5: **formázás**, törlés, átnevezés), partíció-szkenner (MBR + logikai lánc) |
+| **Műhely (0.5)** | **QUARTZ-4B** (a KIMI-MATE 4 bites gép portja BASIC-szel és játékokkal), **Partíciókezelő**, **Telepítő** (más oprendszerek mellé), **Keringő Commander** (duplapaneles fájlkezelő hex-nézővel és .KPA-tömörítővel), **Távvezérlő** (KRVP1: képernyő-megosztás + távoli bemenet) |
+| Grafika | VBE lineáris framebuffer (a gép által felajánlott módban, pl. 1024×768 vagy 1280×800×32; **0.5: biztonságos 640×480×32 alap mód + GRUB-menyü régi monitorokra**), dupla puffer, saját 8×8 font **magyar ékezetekkel** (ő ű ű Ű kézi bitkép), saját 3D vetítő, textúrázott keringő panelek, **raycaster** (texturált falak + sprite-billboardok) |
 | Felület | 10 keringő panel: Mag, Óra, Feladatok, Jegyzet, Lemez, Róla, Frissítés, Böngésző, Beállítás, **Programok** (alkalmazásindító) — HU/EN (F1) |
 | **Programok (0.3)** | **Festő**, **Szövegszerkesztő**, **Labirintus 3D**, **Pokoljáró**, **Csillagvadász**, **Városépítő**, **Űrkadét Flipper**, **Számológép**, **Képernyővédők** (5 db), egérrel és billentyűzettel is |
 | Frissítés | `KERINGO.UPD` csomag **pendrájvról vagy HTTP-ről**, telepítés `/sys`-be, élő (kexec) frissítés, visszaállítás |

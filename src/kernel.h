@@ -52,8 +52,9 @@ typedef struct {
     u32 framebuffer_pitch;
     u32 framebuffer_width;
     u32 framebuffer_height;
-    u32 framebuffer_bpp;
-    u32 framebuffer_type;      /* 1 = RGB */
+    u8  framebuffer_bpp;         /* BÁJT! (a spec szerint) */
+    u8  framebuffer_type;        /* 1 = RGB */
+    u16 framebuffer_pad;
     u32 color_info[6];
 } multiboot_info_t;
 
@@ -160,7 +161,7 @@ int  vfs_read_any(const char *name, u8 *buf, u32 bufsize, u32 *outlen);
 #define KEY_END   0x96
 
 /* ---------- verzió ---------- */
-#define KERINGO_VERZIO "0.4.0"
+#define KERINGO_VERZIO "0.5.0"
 
 /* ---------- crc32 ---------- */
 u32 crc32_calc(u32 crc, const u8 *buf, u32 len);
@@ -444,6 +445,25 @@ void lab_enter(void); void lab_frame(u32 t); void lab_key(u8 sc,u8 rel,u8 a); vo
 void miner_enter(void); void miner_frame(u32 t); void miner_key(u8 sc,u8 rel,u8 a); void miner_exit(void);
 void zx81_app_enter(void); void zx81_app_frame(u32 t); void zx81_app_key(u8 sc, u8 rel, u8 a); void zx81_app_exit(void);
 
+/* ---------- 0.5 újdonságok ---------- */
+void quartz_app_enter(void); void quartz_app_frame(u32 t); void quartz_app_key(u8 sc, u8 rel, u8 a); void quartz_app_exit(void);
+void partman_enter(void);  void partman_frame(u32 t);  void partman_key(u8 sc, u8 rel, u8 a); void partman_exit(void);
+void installer_enter(void); void installer_frame(u32 t); void installer_key(u8 sc, u8 rel, u8 a); void installer_exit(void);
+void commander_enter(void); void commander_frame(u32 t); void commander_key(u8 sc, u8 rel, u8 a); void commander_exit(void);
+void remote_enter(void); void remote_frame(u32 t); void remote_key(u8 sc, u8 rel, u8 a);
+void remote_mouse(int mx,int my,int dx,int dy,u8 btn,u8 prev); void remote_exit(void);
 
+
+
+/* ---------- 0.5: FAT32/vfs/iso/ps2/tcp bővítések ---------- */
+int  fat32_format(blkdev_t *bd, const char *label);
+int  fat32_delete(fatfs_t *fs, const char *path);
+int  fat32_rename(fatfs_t *fs, const char *path, const char *newname);
+fatfs_t *vfs_sys_fs(void);
+fatfs_t *vfs_usb_fs(void);
+int  vfs_mount_sys_manual(int usb, int idx, u32 lba, u32 cnt);
+int  iso_find_path(const char *path, u32 *lba, u32 *size);
+void ps2_inject_key(u8 sc, u8 rel, u8 ascii);
+void ps2_inject_mouse(s32 dx, s32 dy, u8 btn);
 
 #endif

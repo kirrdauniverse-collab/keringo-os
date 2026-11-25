@@ -21,10 +21,17 @@ const app_t app_list[] = {
     { {"Keringő Lab",          "Keringo Lab"},    lab_enter, lab_frame, lab_key, 0, lab_exit, 0 },
     { {"Orbit Miner",           "Orbit Miner"},    miner_enter, miner_frame, miner_key, 0, miner_exit, 0 },
     { {"ZX81 Retro",          "ZX81 Retro"},       zx81_app_enter, zx81_app_frame, zx81_app_key, 0, zx81_app_exit, 0 },
+    { {"QUARTZ-4B",           "QUARTZ-4B"},       quartz_app_enter, quartz_app_frame, quartz_app_key, 0, quartz_app_exit, 0 },
+    { {"Partíciókezelő",       "Partitions"},      partman_enter, partman_frame, partman_key, 0, partman_exit, 0 },
+    { {"Telepítő",             "Installer"},       installer_enter, installer_frame, installer_key, 0, installer_exit, 0 },
+    { {"Commander",            "Commander"},       commander_enter, commander_frame, commander_key, 0, commander_exit, 0 },
+    { {"Távvezérlő",           "Remote control"},  remote_enter, remote_frame, remote_key, remote_mouse, remote_exit, 0 },
 };
 const int APP_COUNT = sizeof(app_list) / sizeof(app_list[0]);
 
-/* gyorsindító billentyűk (galaxis nézetben) */
+/* gyorsindító billentyűk (galaxis nézetben) — a panelek saját F-gombjait
+ * (Lemez F5, Beállítás F8) nem írjuk felül: az új appok a Programok panelről
+ * indíthatók (görgethető lista) */
 const int app_hotkey_app[] = { 0, 1, 2, 3, 4, 5, 6, 9 };
 const u8  app_hotkey_key[] = { KEY_F3, KEY_F4, KEY_F7, KEY_F9, KEY_F10, KEY_F11, KEY_F12, KEY_F6 };
 const int APP_HOTKEYS = sizeof(app_hotkey_key);

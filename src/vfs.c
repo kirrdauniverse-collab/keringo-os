@@ -201,6 +201,22 @@ int vfs_mount_all(void) {
     return 1;
 }
 
+/* 0.5: kézi /sys-csatolás a Telepítőnek — a megadott partíciót csatolja /sys-ként
+ * (a telepítés után a vfs_mount_all() a jelölő alapján már megtalálja). */
+int vfs_mount_sys_manual(int usb, int idx, u32 lba, u32 cnt) {
+    sys_fs = 0; sys_ready = 0;
+    if (usb) {
+        if (!try_mount(rd_usb, wr_usb, 0, lba, cnt, 1, "PENDRIVE", &sys_fs)) return 0;
+    } else {
+        char lbl[16];
+        ksnprintf(lbl, sizeof(lbl), "sda%d", idx + 1);
+        if (!try_mount(rd_ata, wr_ata, (void *)(uptr)idx, lba, cnt, 0, lbl, &sys_fs)) return 0;
+    }
+    sys_ready = 1;
+    kprintf("vfs: /sys kézzel felcsatolva (lba=%u)\n", lba);
+    return 1;
+}
+
 /* ---------- VFS ---------- */
 int vfs_list(const char *dir, char names[][64], u32 *sizes, u8 *flags, int max) {
     if (vfs_strcmp(dir, "/cd"))  return iso_mounted() ? iso_root_list(names, 0, sizes, flags, max) : -1;
@@ -234,6 +250,8 @@ int vfs_read_file(const char *path, char *buf, int bufsize, int *outlen) {
         u32 lba, size;
         if (!iso_mounted()) return 0;
         if (iso_find(path + 4, &lba, &size)) return iso_read_file(lba, size, buf, bufsize, outlen);
+        /* 0.5: alkönyvtárak az ISO-n (pl. /cd/boot/keringo.elf) */
+        if (iso_find_path(path + 4, &lba, &size)) return iso_read_file(lba, size, buf, bufsize, outlen);
         return 0;
     }
     if (path[0] == '/' && path[1] == 'm' && path[2] == 'e' && path[3] == 'm' && path[4] == '/') {

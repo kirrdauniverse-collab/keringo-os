@@ -6,6 +6,33 @@
 
 u32 g_mbi_phys = 0;
 
+/* 0.5: ha nem jött framebuffer-info (pl. betöltő nem adott grafikus módot),
+ * világos magyar üzenet a VGA-szöveges képernyőn a fekete helyett. */
+static void vga_text_msg(const char *const *lines, int n) {
+    volatile u16 *v = (volatile u16 *)0xB8000;
+    for (int i = 0; i < n; i++) {
+        int col = 0;
+        for (const char *s = lines[i]; *s && col < 78; s++, col++)
+            v[i * 80 + col] = (u16)((0x0A << 8) | (u8)*s);
+    }
+}
+
+static void no_fb_halt(void) {
+    static const char *const msg[] = {
+        "KERINGO OS: a grafikus mod nem indult el.",
+        "",
+        "Oka: a betolto nem adott VBE framebuffer-modot, vagy a",
+        "monitor nem tamogatja a valasztott felbontast.",
+        "",
+        "Megoldas: bootold ujra, es vallaszd a 'biztonsagos 640x480'",
+        "menupontot a lemezindito menuben.",
+        "",
+        "(A rendszer most leall. Tobb informacio: README)"
+    };
+    vga_text_msg(msg, 9);
+    for (;;) hlt();
+}
+
 /* háttér-pulzus: soros log 5 s-enként */
 static void pulzus_task(void) {
     u32 last = 0;
@@ -66,8 +93,12 @@ void kmain(u32 magic, multiboot_info_t *mbi) {
         for (;;) hlt();
     }
     g_mbi_phys = (u32)mbi;
-    if (!(mbi->flags & MBI_FLAG_FRAMEBUFFER) || mbi->framebuffer_bpp > 64) {
-        kprintf("FIGY: nincs hasznalhato framebuffer-info\n");
+    if (magic == 0x2BADB002 && (!(mbi->flags & MBI_FLAG_FRAMEBUFFER) ||
+        mbi->framebuffer_width < 100 || mbi->framebuffer_bpp > 64)) {
+        kprintf("FIGY: nincs hasznalhato framebuffer-info (flags=%x w=%d bpp=%d)\n",
+                mbi->flags, mbi->framebuffer_width, mbi->framebuffer_bpp);
+        serial_puts("KERINGO: no framebuffer -> VGA uzenet es leallitas\n");
+        no_fb_halt();
     }
 
     cpu_init();
