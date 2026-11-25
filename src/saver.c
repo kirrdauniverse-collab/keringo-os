@@ -294,7 +294,13 @@ void saver_frame(u32 tick) {
 /* ---------- Képernyővédők menü app ---------- */
 static int sm_sel = 0;
 
-int savermenu_esc(void) { return saver_running(); }
+/* 0.5 JAVÍTÁS: az Esc most tényleg LEÁLLÍTJA a futó képernyővédőt.
+   Korábban csak jelezte, hogy fut — a keretrendszer elfogyasztotta az Escet,
+   a védő pedig futott tovább (a Le gomb állította le véletlenül). */
+int savermenu_esc(void) {
+    if (saver_running()) { saver_stop(); return 1; }
+    return 0;
+}
 
 void savermenu_enter(void) {
     sm_sel = 0;

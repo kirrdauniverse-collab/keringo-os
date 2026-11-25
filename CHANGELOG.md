@@ -55,6 +55,18 @@ A felhasználói hibajelentésekre épülő javító- és bővítőkiadás: 5 ú
   a demo rádión át ment); (b) valódi TCP-ellenőrző összeg + hálózati bájtsorrend
   az ablak/összeg mezőknél (a korábbi kis-endian írásokat a valós stackok eldobják).
 - **Multiboot-info**: a framebuffer_bpp BÁJT (nem u32) — az ellenőrzés most helyes.
+- **Böngésző F6 (0.3 óta rejtett hiba)**: az alkalmazás-gyorsbillentyűk MINDEN nézetben
+  elsültek — a F6 (Wi-Fi) felülírta a böngésző F6-os URL-szerkesztőjét, így az URL beírása
+  lehetetlen volt. Most a gyorsgombok csak a galaxis-nézetben élnek.
+- **tcp_send FIN-abort**: ha a szerver a válasz után azonnal FIN-t küld (Connection: close),
+  a FIN a GET küldése közben érkezett meg — a küldő ciklus a state=3-at hibának vette és
+  CSENDBEN megszakította a letöltést (kis válaszoknál mindig, nagyoknál időzítés-szerencsétől
+  függően). Most csak RST szakítja meg a küldést — ezzel a böngésző valódi TCP-n teljesen
+  működik: QEMU-ban tesztelve 200 OK + HTML-megjelenítés + JPEG-dekódolás + link-követés.
+- **Képernyővédő-menü Esc**: a futó képernyővédőt az Esc nem állította le (csak jelentette,
+  hogy fut — keretrendszer elfogyasztotta a gombot); most az Esc tényleg leállítja.
+- Diagnosztika: HTTP-napló a sorosporton (fetch / kapcsolat / GET / status sorok),
+  TCP RST-nyom, böngésző-URL-napló.
 
 Megjegyzések: ext2/NTFS-olvasás még nincs (FAT32 olvasás+írás van) — a 0.6-os
 tervben szerepel; a QUARTZ-4B-ben a kifejezések teljes értéken értékelődnek

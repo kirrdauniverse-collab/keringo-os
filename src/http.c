@@ -133,14 +133,18 @@ static int dl_append(const u8 *data, u32 len, u32 offset) {
 int http_fetch(const char *url, http_result_t *res) {
     urlinfo_t u;
     res->body = 0; res->body_len = 0; res->status = 0; res->content_type[0] = 0;
+    kprintf("http: fetch [%s] net=%d\n", url, net_up());   /* 0.5: belépés-napló */
     int pr = parse_url(url, &u);
     if (pr != 1) return pr == -2 ? -2 : 0;
+    kprintf("http: parse OK host=%s port=%u\n", u.host, u.port);
     u32 ip;
     if (!net_dns_resolve(u.host, &ip)) { kprintf("http: host nem talalhato\n"); return 0; }
     tcpconn_t *c = tcp_alloc();
-    if (!c) return 0;
+    if (!c) { kprintf("http: nincs TCP slot\n"); return 0; }
     if (!tcp_connect(c, ip, u.port)) { tcp_close(c); return 0; }
+    kprintf("http: kapcsolat OK (%x:%u)\n", ip, u.port);   /* D10 */
     if (!http_request(c, &u, 0)) { tcp_close(c); return 0; }
+    kprintf("http: GET elkuldve\n");                        /* D10 */
 
     u32 total = 0;
     int header_end = -1;
@@ -171,6 +175,7 @@ int http_fetch(const char *url, http_result_t *res) {
     if (header_end < 0) { kprintf("http: nincs fejléc-vége\n"); return 0; }
     int chunked = 0; u32 clen = 0;
     parse_headers(dlbuf, (u32)header_end, res, &chunked, &clen);
+    kprintf("http: status=%u hossz=%u tipus=%s\n", res->status, total, res->content_type);   /* 0.5: letöltés-napló */
 
     u8 *body = dlbuf + header_end;
     u32 blen = total - (u32)header_end;

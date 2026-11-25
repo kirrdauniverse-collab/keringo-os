@@ -88,7 +88,7 @@ int tcp_connect(tcpconn_t *c, u32 rip, u16 rport) {
     while ((s32)(tick_count() - until) < 0) {
         net_poll();
         if (c->state == 2) return 1;
-        if (c->state == 0) return 0;
+        if (c->state == 0) { kprintf("tcp: RST — a kapcsolat elutasitva\n"); return 0; }
         hlt();
     }
     kprintf("tcp: connect idotullepes\n");
@@ -261,14 +261,18 @@ int tcp_send(tcpconn_t *c, const u8 *data, u32 len) {
             offset += chunk;
             c->last_send = tick_count();
             net_poll_ms(20);
-            if (c->state != 2) return 0;
+            /* 0.5 JAVÍTÁS: FIN (state=3) NEM küldési hiba! A szerver a válasz
+               után azonnal lezárhatja a kapcsolatot — a GET már kiment, és a
+               válasz már a pufferben van. Csak RST (state=0) szakítja meg a küldést. */
+            if (c->state == 0) return 0;
         }
         c->snd_nxt = start_seq + len;
-        /* várakozás a teljes ACK-re */
+        /* várakozás a teljes ACK-re (FIN mellett is — a válasz már jöhet) */
         u32 until = tick_count() + 100;
         while ((s32)(tick_count() - until) < 0) {
             net_poll();
             if ((s32)(c->snd_una - start_seq) >= (s32)len) return 1;
+            if (c->state == 0) return 0;      /* csak RST szakít meg */
             hlt();
         }
     }

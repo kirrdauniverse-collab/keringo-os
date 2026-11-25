@@ -670,14 +670,18 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
         app_key_event(sc, rel, ascii);
         return;
     }
-    /* ---- 0.3: alkalmazás gyorsbillentyűk (minden nézetben) ---- */
-    for (int k = 0; k < APP_HOTKEYS; k++) {
-        if (sc == app_hotkey_key[k]) { app_launch(app_hotkey_app[k]); return; }
-    }
     /* ---- 0.3: futó képernyővédő: bármi leállítja ---- */
     if (saver_running()) {
         saver_stop();
         return;
+    }
+    /* ---- 0.5 JAVÍTÁS: alkalmazás-gyorsbillentyűk CSAK a galaxis-nézetben!
+       Korábban „minden nézetben” elsültek, és a F6 (Wi-Fi) felülírta a
+       böngésző F6-os URL-szerkesztőjét — az URL beírása lehetetlen volt. ---- */
+    if (focus_panel < 0 && !url_edit) {
+        for (int k = 0; k < APP_HOTKEYS; k++) {
+            if (sc == app_hotkey_key[k]) { app_launch(app_hotkey_app[k]); return; }
+        }
     }
     /* URL beviteli mód (böngészőben) */
     if (url_edit) {
@@ -685,6 +689,7 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
         if (sc == KEY_ENTER || ascii == '\n') {
             url_edit = 0;
             urlbuf[url_len] = 0;
+            kprintf("bongeszo: submit [%s] (%d)\n", urlbuf, url_len);
             if (url_len > 7) browser_open(urlbuf);
             return;
         }
@@ -731,7 +736,7 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
     if (focus_panel == P_BONGESZO) {
         if (sc == KEY_ESC) { view_target = 0; focus_panel = -1; return; }
         if (sc == KEY_F5) { browser_open(browser_url()); return; }
-        if (sc == KEY_F6) { url_edit = 1; url_len = 0; urlbuf[0] = 0; return; }
+        if (sc == KEY_F6) { url_edit = 1; url_len = 0; urlbuf[0] = 0; kprintf("bongeszo: URL mod\n"); return; }
         if (sc == KEY_UP)   { browser_scroll(-1); return; }
         if (sc == KEY_DOWN) { browser_scroll(1); return; }
         if (sc == KEY_PGUP) { browser_scroll(-10); return; }
