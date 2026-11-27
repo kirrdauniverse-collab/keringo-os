@@ -1,5 +1,65 @@
 # Keringő OS — Változásjegyzék
 
+## 0.5.1 — „MI és képernyők" (2026-11-27)
+
+A kérdésedre épülő kiadás: „Van benne AI?" — most már van (KIRRDA AI 0.2),
+méghozzá valódi képességekkel. Plusz a videó-rendszer gyökeres újraírása:
+a biztonságos 640×480×16 mostantól TÉNYLEGESEN beállul, GRUB-menüből
+8 bites / 32 bites / 1024-es módok választhatók, és az új Indítópanel
+minden appot egy képernyőn mutat.
+
+### Videó / monitorok (gyökeres javítás)
+
+- **Multiboot-fejléc javítása**: a videó-mezők (mode_type/width/height/depth)
+  a spec szerint a fejléc 32. offsetjén kezdődnek — eddig a 12.-nél voltak,
+  ezért a GRUB SOSEM látta a kérést, és mindenhol EDIC-auto (1280×800)
+  bootolt, még a „biztonságos" menüponttal is. Most a GRUB ténylegesen
+  beállítja a kért módot.
+- **Alapértelmezett boot: 640×480×16** — pontosan, amit kértél; a régi
+  CRT-k is bírják. A GRUB-menüben választható:
+  **640×480×8** (max. kompatibilitás — RGB332 palettát a kernel állítja a
+  videó-RAMDAC-ba), **640×480×32**, **1024×768×32**, **auto** (GRUB/EDID).
+- **bpp-agnosztikus kernel**: a UI 32 bites háttérbufferben rajzol, a
+  gfx_flip 8/16/24/32 bites VBE-módba konvertál — bármely módban ugyanaz
+  a kinézet.
+- **Szép mód** (Beállítás panelen BE/KI, KERINGO.CFG-ben tárolva):
+  élsímított (Wu-féle) vonalak és körök, gradiens fejlécek/gombok,
+  lekerekített kártyák, lágy árnyékok — a Festő, az Indítópanel és minden
+  app-chrome érezhetően csinosabb.
+
+### KIRRDA AI 0.2 — a helyi „kisagy" kinőtt igazi képességeket
+
+- **Eredet**: a KIRRDA AI a 0.2-es „Keringo Mega Pack" PR-ből jött be, és
+  sosem volt dokumentálva — ezért nem láttad sehol. Mostantól az Indítópanel
+  RENDSZER fülén és a README-ben is szerepel.
+- **Matek**: rekurzív leszálló kifejezés-elemző — „12*34+7" → „= 415".
+- **Alkalmazás-indítás természetes nyelven**: „indítsd a festőt" → megnyílik.
+- **Fájlkeresés**: „keres: cfg" → /cd/KERINGO.CFG (mem/sys/usb/cd).
+- **Tanítható**: „tanits: kerdes = valasz" (KIRRDA.TXT-ben perzisztál,
+  /mem + /sys), „jegyezd/emlekszel/elfelejt" jegyzetek.
+- **Internet**: „internet: http://cim" letölti az oldalt és a szövegét
+  kiírja a csevegésbe; „dns: example.com" → 104.20.23.154. Őszinte
+  korlát: HTTPS (TLS) nincs, így modern titkosított oldalakat nem ér el.
+- DNS-javítás: a válasz-port (0x4B45) fogadása és a tömörített
+  név-mutatók (0xC0) értelmezése — a DHCP-fallback óta ez volt az első
+  működő UDP/DNS-fogadás.
+
+### Indítópanel (ÚJ)
+
+- Teljes képernyős, megbízható alkalmazás-indító (F5 a galaxisban):
+  kategóriák (MIND/JÁTÉK/MŰHELY/RENDSZER/RETRO/HÁLÓ, Tab), azonnali
+  keresés gépeléssel (globálisan, kategóriát függetlenül), nyíl-navigáció,
+  Enter = indítás, egérrel kattintásra is indul. Minden app egy helyen,
+  leírással — többé nem kell vadászni a keringő ablakok közt.
+
+### Egyéb
+
+- Böngésző: README-válasz a HTML5-kérdésre (HTML-részhalmaz + MJPEG;
+  JS/CSS/HTML5 nem — őszintén leírva).
+- hibajavítás: az UDP-beérkező csomagok célport-szűrése (DNS-válaszok
+  a lekérdezés forrásportjára jönnek).
+- SHA256SUMS, galeria_051.html az új képernyőképekkel.
+
 ## 0.5.0 — „Műhely" (2026-11-25)
 
 A felhasználói hibajelentésekre épülő javító- és bővítőkiadás: 5 új alkalmazás,

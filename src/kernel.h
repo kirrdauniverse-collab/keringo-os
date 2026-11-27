@@ -161,7 +161,7 @@ int  vfs_read_any(const char *name, u8 *buf, u32 bufsize, u32 *outlen);
 #define KEY_END   0x96
 
 /* ---------- verzió ---------- */
-#define KERINGO_VERZIO "0.5.0"
+#define KERINGO_VERZIO "0.5.1"
 
 /* ---------- crc32 ---------- */
 u32 crc32_calc(u32 crc, const u8 *buf, u32 len);
@@ -246,6 +246,7 @@ typedef struct {
     int  icon_theme;
     int  accent;
     int  lang;
+    int  szep_mod;               /* 0.5.1: élsímítás + gradiens + árnyék BE/KI */
     char update_url[96];
     char note[600];
 } settings_t;
@@ -332,6 +333,7 @@ u32 *gfx_backbuf(void);   /* belső háttérpuffer (gyors rajzoláshoz) */
 void gfx_init(multiboot_info_t *mbi);
 u32  gfx_width(void);
 u32  gfx_height(void);
+u32  gfx_bpp(void);          /* 0.5.1: kimeneti bitszínesség (8/16/24/32) */
 void gfx_flip(void);
 void gfx_clear(u32 color);
 void gfx_fill_rect(int x, int y, int w, int h, u32 color);
@@ -342,6 +344,14 @@ void gfx_pixel(int x, int y, u32 color);
 void gfx_draw_text(int x, int y, const char *s, u32 fg, u32 bg);
 int  gfx_text_width(const char *s);
 void gfx_draw_text_scaled(int x, int y, const char *s, u32 fg, u32 scale);
+/* 0.5.1 Szép mód rajzsegédek */
+u32  gfx_lerp_color(u32 c1, u32 c2, u32 t);
+void gfx_blend_pixel(int x, int y, u32 c, u32 alpha);
+void gfx_aa_line(int x0, int y0, int x1, int y1, u32 c);
+void gfx_aa_circle(int cx, int cy, int r, u32 c);
+void gfx_gradient_rect(int x, int y, int w, int h, u32 c_top, u32 c_bot);
+void gfx_rounded_fill(int x, int y, int w, int h, int r, u32 c);
+void gfx_shadow_rounded(int x, int y, int w, int h, int r, u32 alpha);
 /* textúra buffer 3D panelekhez */
 typedef struct { int w, h; u32 *px; } texture_t;
 texture_t *texture_new(int w, int h);
@@ -440,6 +450,17 @@ void wifiapp_enter(void); void wifiapp_frame(u32 t); void wifiapp_key(u8 sc, u8 
 
 void basic_enter(void); void basic_frame(u32 t); void basic_key(u8 sc,u8 rel,u8 a); void basic_exit(void);
 void kirrda_enter(void); void kirrda_frame(u32 t); void kirrda_key(u8 sc,u8 rel,u8 a); void kirrda_exit(void);
+
+/* ---------- app_launcher.c (0.5.1 Indítópanel) ---------- */
+void launcher_enter(void); void launcher_frame(u32 t);
+void launcher_key(u8 sc, u8 rel, u8 a);
+void launcher_mouse(int mx, int my, int dx, int dy, u8 btn, u8 prev);
+void launcher_exit(void);
+int  launcher_esc(void);
+
+/* alkalmazás-kategóriák (apps.c, az Indítópanelhoz):
+ * 0=mind 1=játék 2=műhely 3=rendszer 4=retro 5=hálózat */
+extern const u8 app_cat[];
 void obs_enter(void); void obs_frame(u32 t); void obs_key(u8 sc,u8 rel,u8 a); void obs_exit(void);
 void lab_enter(void); void lab_frame(u32 t); void lab_key(u8 sc,u8 rel,u8 a); void lab_exit(void);
 void miner_enter(void); void miner_frame(u32 t); void miner_key(u8 sc,u8 rel,u8 a); void miner_exit(void);

@@ -6,7 +6,7 @@
 static int kstreq(const char *a, const char *b);
 
 settings_t settings = {
-    0, "HATTER1.JPG", 0, 0, 0,
+    0, "HATTER1.JPG", 0, 0, 0, 1,
     "http://10.0.2.2:8000/KERINGO.UPD",
     ""
 };
@@ -78,6 +78,7 @@ void settings_load(void) {
             else if (kstreq(key, "icon_theme")) settings.icon_theme = parse_int(val);
             else if (kstreq(key, "accent")) settings.accent = parse_int(val);
             else if (kstreq(key, "lang")) settings.lang = parse_int(val) & 1;
+            else if (kstreq(key, "szep_mod")) settings.szep_mod = parse_int(val) ? 1 : 0;
             else if (kstreq(key, "update_url")) {
                 int j;
                 for (j = 0; j < 95 && val[j]; j++) settings.update_url[j] = val[j];
@@ -106,9 +107,9 @@ static int kstreq(const char *a, const char *b);
 int settings_save(void) {
     char cfg[1024];
     ksnprintf(cfg, sizeof(cfg),
-              "wallpaper=%d\nwp_file=%s\nicon_theme=%d\naccent=%d\nlang=%d\nupdate_url=%s\n",
+              "wallpaper=%d\nwp_file=%s\nicon_theme=%d\naccent=%d\nlang=%d\nszep_mod=%d\nupdate_url=%s\n",
               settings.wallpaper, settings.wp_file, settings.icon_theme,
-              settings.accent, settings.lang, settings.update_url);
+              settings.accent, settings.lang, settings.szep_mod, settings.update_url);
     int len = 0;
     while (cfg[len]) len++;
     if (sys_mounted() && vfs_write_file("/sys/KERINGO.CFG", cfg, len)) return 1;

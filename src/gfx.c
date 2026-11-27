@@ -1,31 +1,85 @@
-/* gfx.c — framebuffer, dupla puffer, primitívek, text, textúra, 3D textúra-rajzolás */
+/* gfx.c — framebuffer, dupla puffer, primitívek, text, textúra, 3D textúra-rajzolás
+ * 0.5.1: bpp-agnosztikus kimenet — a UI mindig 32 bites háttérbufferben rajzol,
+ * a gfx_flip 8/16/24/32 bites VBE módba konvertál (a GRUB menü mindkettő
+ * elérhető). 8 bites módnál a RAMDAC palettát RGB332-re állítjuk.
+ * Szép mód segédek: élsímított (AA) vonal/kör, gradiens, lekerekítés, árnyék. */
 #include "kernel.h"
 
 static u32  fb_w = 0, fb_h = 0, fb_pitch = 0;
 static u32 *fb_lin = 0;         /* valódi framebuffer (0x80000000) */
 static u32 *back = 0;           /* dupla puffer */
+static u8   fb_bpp = 32;         /* kimeneti bitszínesség */
 static u32  clr_fg = 0xFFF0F0F0, clr_bg = 0xFF1A2126;
+
+/* RAMDAC: 8 bites módnál RGB332 paletta a videó-DAC-be (0x3C8/0x3C9) */
+static void ramdac_rgb332(void) {
+    outb(0x3C8, 0);
+    for (int i = 0; i < 256; i++) {
+        int r = (i >> 5) & 7, g = (i >> 2) & 7, b = i & 3;
+        outb(0x3C9, (u8)(r * 63 / 7));
+        outb(0x3C9, (u8)(g * 63 / 7));
+        outb(0x3C9, (u8)(b * 63 / 3));
+    }
+}
 
 void gfx_init(multiboot_info_t *mbi) {
     fb_w = mbi->framebuffer_width;
     fb_h = mbi->framebuffer_height;
     fb_pitch = mbi->framebuffer_pitch;
+    fb_bpp = mbi->framebuffer_bpp ? mbi->framebuffer_bpp : 32;
     fb_lin = (u32 *)mem_fb_vaddr();
+    if (fb_bpp == 8) ramdac_rgb332();
     back = (u32 *)kmalloc(fb_w * fb_h * 4);
     for (u32 i = 0; i < fb_w * fb_h; i++) back[i] = 0xFF10151A;
-    kprintf("gfx: %dx%d pitch=%d buffer=%x\n", fb_w, fb_h, fb_pitch, (u32)back);
+    kprintf("gfx: %dx%d bpp=%d pitch=%d buffer=%x\n", fb_w, fb_h, fb_bpp, fb_pitch, (u32)back);
 }
 
 u32 *gfx_backbuf(void) { return back; }
 u32 gfx_width(void)  { return fb_w; }
 u32 gfx_height(void) { return fb_h; }
+u32 gfx_bpp(void)    { return fb_bpp; }
+
+/* 32 bites 0xFFRRGGBB -> célformátum */
+static u8 to332(u32 c) {
+    return (u8)((((c >> 16) & 0xFF) >> 5) << 5 | ((((c >> 8) & 0xFF) >> 5) << 2) | (((c) & 0xFF) >> 6));
+}
 
 void gfx_flip(void) {
     if (!fb_lin || !back) return;
-    u32 *dst = fb_lin;
+    u8 *base = (u8 *)fb_lin;
     u32 *src = back;
-    for (u32 y = 0; y < fb_h; y++) {
-        for (u32 x = 0; x < fb_w; x++) dst[y * (fb_pitch / 4) + x] = src[y * fb_w + x];
+    if (fb_bpp == 32) {
+        for (u32 y = 0; y < fb_h; y++) {
+            u32 *dst = (u32 *)(base + y * fb_pitch);
+            u32 *row = src + y * fb_w;
+            for (u32 x = 0; x < fb_w; x++) dst[x] = row[x];
+        }
+    } else if (fb_bpp == 16) {
+        for (u32 y = 0; y < fb_h; y++) {
+            u16 *dst = (u16 *)(base + y * fb_pitch);
+            u32 *row = src + y * fb_w;
+            for (u32 x = 0; x < fb_w; x++) {
+                u32 c = row[x];
+                dst[x] = (u16)((((c >> 16) & 0xF8) << 8) | (((c >> 8) & 0xFC) << 3) | ((c & 0xF8) >> 3));
+            }
+        }
+    } else if (fb_bpp == 24) {
+        for (u32 y = 0; y < fb_h; y++) {
+            u8 *dst = base + y * fb_pitch;
+            u32 *row = src + y * fb_w;
+            for (u32 x = 0; x < fb_w; x++) {
+                u32 c = row[x];
+                dst[3 * x]     = (u8)(c & 0xFF);
+                dst[3 * x + 1] = (u8)((c >> 8) & 0xFF);
+                dst[3 * x + 2] = (u8)((c >> 16) & 0xFF);
+            }
+        }
+    } else {                      /* 8 bites palettás */
+        for (u32 y = 0; y < fb_h; y++) {
+            u8 *dst = base + y * fb_pitch;
+            u32 *row = src + y * fb_w;
+            for (u32 x = 0; x < fb_w; x++) dst[x] = to332(row[x]);
+        }
     }
 }
 
@@ -48,6 +102,131 @@ void gfx_fill_rect(int x, int y, int w, int h, u32 color) {
             if (xx < 0 || (u32)xx >= fb_w) continue;
             row[xx] = color;
         }
+    }
+}
+
+/* ---------- 0.5.1 Szép mód: keverés, élsímítás, gradiens ---------- */
+
+u32 gfx_lerp_color(u32 c1, u32 c2, u32 t) {   /* t: 0..255 */
+    if (t > 255) t = 255;
+    u32 r1 = (c1 >> 16) & 0xFF, g1 = (c1 >> 8) & 0xFF, b1 = c1 & 0xFF;
+    u32 r2 = (c2 >> 16) & 0xFF, g2 = (c2 >> 8) & 0xFF, b2 = c2 & 0xFF;
+    u32 r = r1 + ((r2 - r1) * t) / 255;
+    u32 g = g1 + ((g2 - g1) * t) / 255;
+    u32 b = b1 + ((b2 - b1) * t) / 255;
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+/* egész számú négyzetgyök (freestanding: nincs libm sqrtf) */
+static int isqrt_i(int v) {
+    if (v <= 0) return 0;
+    int r = 0, bit = 1 << 14;
+    while (bit > v) bit >>= 2;
+    while (bit) {
+        if (v >= r + bit) { v -= r + bit; r = (r >> 1) + bit; }
+        else r >>= 1;
+        bit >>= 2;
+    }
+    return r;
+}
+
+void gfx_blend_pixel(int x, int y, u32 c, u32 alpha) {  /* alpha 0..255 */
+    if (x < 0 || y < 0 || (u32)x >= fb_w || (u32)y >= fb_h || alpha == 0) return;
+    if (alpha >= 255) { back[(u32)y * fb_w + (u32)x] = c; return; }
+    u32 d = back[(u32)y * fb_w + (u32)x];
+    u32 dr = (d >> 16) & 0xFF, dg = (d >> 8) & 0xFF, db = d & 0xFF;
+    u32 sr = (c >> 16) & 0xFF, sg = (c >> 8) & 0xFF, sb = c & 0xFF;
+    u32 r = dr + ((sr - dr) * alpha) / 255;
+    u32 g = dg + ((sg - dg) * alpha) / 255;
+    u32 b = db + ((sb - db) * alpha) / 255;
+    back[(u32)y * fb_w + (u32)x] = 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
+/* Xiaolin Wu-féle élsímított vonal */
+void gfx_aa_line(int x0, int y0, int x1, int y1, u32 c) {
+    int dx = x1 - x0, dy = y1 - y0;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    if (dx == 0 && dy == 0) { gfx_blend_pixel(x0, y0, c, 255); return; }
+    if (dx >= dy) {
+        if (x0 > x1) { int t = x0; x0 = x1; x1 = t; t = y0; y0 = y1; y1 = t; }
+        float grad = (x1 != x0) ? (float)(y1 - y0) / (float)(x1 - x0) : 0.0f;
+        float y = (float)y0 + 0.5f;
+        for (int x = x0; x <= x1; x++) {
+            int yi = (int)y;
+            float f = y - (float)yi;
+            gfx_blend_pixel(x, yi,     c, (u32)((1.0f - f) * 255.0f));
+            gfx_blend_pixel(x, yi + 1, c, (u32)(f * 255.0f));
+            y += grad;
+        }
+    } else {
+        if (y0 > y1) { int t = y0; y0 = y1; y1 = t; t = x0; x0 = x1; x1 = t; }
+        float grad = (y1 != y0) ? (float)(x1 - x0) / (float)(y1 - y0) : 0.0f;
+        float x = (float)x0 + 0.5f;
+        for (int y = y0; y <= y1; y++) {
+            int xi = (int)x;
+            float f = x - (float)xi;
+            gfx_blend_pixel(xi,     y, c, (u32)((1.0f - f) * 255.0f));
+            gfx_blend_pixel(xi + 1, y, c, (u32)(f * 255.0f));
+            x += grad;
+        }
+    }
+}
+
+/* élsímított körvonal (távolság-alapú lefedettség) */
+void gfx_aa_circle(int cx, int cy, int r, u32 c) {
+    for (int y = -r - 1; y <= r + 1; y++) {
+        for (int x = -r - 1; x <= r + 1; x++) {
+            float d = (float)isqrt_i(x * x + y * y) - (float)r;
+            float a = 0.5f - d;                    /* 1: belül, 0: szélen túl 0.5-gyel */
+            if (a <= 0) continue;
+            if (a >= 1) gfx_blend_pixel(cx + x, cy + y, c, 255);
+            else        gfx_blend_pixel(cx + x, cy + y, c, (u32)(a * 255.0f));
+        }
+    }
+}
+
+/* függőleges színátmenet-kitöltés */
+void gfx_gradient_rect(int x, int y, int w, int h, u32 c_top, u32 c_bot) {
+    if (h <= 0 || w <= 0) return;
+    for (int j = 0; j < h; j++) {
+        u32 c = (h > 1) ? gfx_lerp_color(c_top, c_bot, (u32)(j * 255 / (h - 1)))
+                        : c_top;
+        gfx_fill_rect(x, y + j, w, 1, c);
+    }
+}
+
+/* lekerekített sarkú kitöltés (r: sarok-sugár) */
+void gfx_rounded_fill(int x, int y, int w, int h, int r, u32 c) {
+    if (r < 0) r = 0;
+    if (r * 2 > w) r = w / 2;
+    if (r * 2 > h) r = h / 2;
+    for (int j = 0; j < h; j++) {
+        int inset = 0;
+        if (j < r) {           /* felső sarkok */
+            int dy = r - j;
+            int chord = isqrt_i(r * r - dy * dy);
+            inset = r - chord;
+        } else if (j >= h - r) { /* alsó sarkok */
+            int dy = r - (h - 1 - j);
+            int chord = isqrt_i(r * r - dy * dy);
+            inset = r - chord;
+        }
+        gfx_fill_rect(x + inset, y + j, w - 2 * inset, 1, c);
+    }
+}
+
+/* lekerekített, félig átlátszó fekete árnyék */
+void gfx_shadow_rounded(int x, int y, int w, int h, int r, u32 alpha) {
+    if (r < 0) r = 0;
+    if (r * 2 > w) r = w / 2;
+    if (r * 2 > h) r = h / 2;
+    for (int j = 0; j < h; j++) {
+        int inset = 0;
+        if (j < r) { int dy = r - j; inset = r - isqrt_i(r * r - dy * dy); }
+        else if (j >= h - r) { int dy = r - (h - 1 - j); inset = r - isqrt_i(r * r - dy * dy); }
+        for (int i = inset; i < w - inset; i++)
+            gfx_blend_pixel(x + i, y + j, 0xFF000000u, alpha);
     }
 }
 

@@ -280,7 +280,7 @@ static void udp_input(const u8 *ip, u32 iplen) {
     const u8 *data = uh + 8;
     u32 dlen = ulen - 8;
     if (dport == 68) dhcp_input(data, dlen);
-    else if (dport == 53) {
+    else if (dport == 53 || dport == 0x4B45) {   /* válasz a mi forrásportunkra jön! */
         /* DNS válasz: id + címek kiemelése */
         if (dlen < 12) return;
         u16 id = (u16)((data[0] << 8) | data[1]);
@@ -288,17 +288,27 @@ static void udp_input(const u8 *ip, u32 iplen) {
         u16 ancount = (u16)((data[6] << 8) | data[7]);  /* már BE */
         if (ancount == 0) return;
         u32 o = 12;
-        /* kérdésnév átugrása */
-        while (o < dlen && data[o]) { o += (u32)data[o] + 1; }
-        o += 5;                              /* null + típus + osztály */
-        for (int a = 0; a < ancount && o + 12 <= dlen; a++) {
-            u16 qtype = (u16)((data[o + 2] << 8) | data[o + 3]);
-            u16 rdlen = (u16)((data[o + 8] << 8) | data[o + 9]);
+        /* kérdésnév átugrása — címkék VAGY tömörített mutató (0xC0 xx) */
+        while (o < dlen && data[o]) {
+            if ((data[o] & 0xC0) == 0xC0) { o += 2; break; }
+            o += (u32)data[o] + 1;
+        }
+        o += 5;                              /* null-címke + típus + osztály */
+        for (int a = 0; a < ancount && o < dlen; a++) {
+            u32 ne = o;                       /* válasz-név vége */
+            if ((data[ne] & 0xC0) == 0xC0) ne += 2;
+            else {
+                while (ne < dlen && data[ne]) ne += (u32)data[ne] + 1;
+                ne += 1;
+            }
+            if (ne + 10 > dlen) return;
+            u16 qtype = (u16)((data[ne] << 8) | data[ne + 1]);
+            u16 rdlen = (u16)((data[ne + 8] << 8) | data[ne + 9]);
             if (qtype == 1 && rdlen == 4) {
-                dns_answer_ip = get_be32(data + o + 10);
+                dns_answer_ip = get_be32(data + ne + 10);
                 return;
             }
-            o += 12 + rdlen;
+            o = ne + 10 + rdlen;
         }
     }
 }

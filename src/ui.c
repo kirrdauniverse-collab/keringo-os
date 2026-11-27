@@ -99,8 +99,8 @@ static const u8 cursor_bmp[12] = {
 /* ---------- szövegek ---------- */
 static const char *TITLE[] = { "KERINGŐ " KERINGO_VERZIO, "ORBIT " KERINGO_VERZIO };
 static const char *HINT_GAL[] = {
-    "Nyilak: forgatás  +/‑: zoom  Enter: belépés  Tab: következő  P: keringés állít  F1: nyelv",
-    "Arrows: rotate  +/-: zoom  Enter: enter  Tab: next  P: pause orbits  F1: language" };
+    "Nyilak: forgatás  +/‑: zoom  Enter: belépés  Tab: következő  P: keringés állít  F5: Indítópanel  F1: nyelv",
+    "Arrows: rotate  +/-: zoom  Enter: enter  Tab: next  P: pause orbits  F5: Launcher  F1: language" };
 static const char *HINT_JEGY[] = {
     "ÍRJ! Backspace töröl, F2 = mentés, Esc = vissza",
     "TYPE! Backspace erases, F2 = save, Esc = back" };
@@ -487,16 +487,16 @@ static void draw_panel_bongeszo(texture_t *t, u32 tick) {
     browser_render(t, tick, focus_panel == P_BONGESZO);
 }
 
-static const char *SET_LABELS[2][6] = {
-    { "Háttérkép", "Fotó fájlja", "Ikontéma", "Kiemelő szín", "Nyelv / Language", "Frissítési URL" },
-    { "Wallpaper", "Photo file", "Icon theme", "Accent color", "Language / Nyelv", "Update URL" },
+static const char *SET_LABELS[2][7] = {
+    { "Háttérkép", "Fotó fájlja", "Ikontéma", "Kiemelő szín", "Nyelv / Language", "Szép mód (élsímítás)", "Frissítési URL" },
+    { "Wallpaper", "Photo file", "Icon theme", "Accent color", "Language / Nyelv", "Smooth look (AA)", "Update URL" },
 };
 
 static void draw_panel_beallitas(texture_t *t, u32 tick) {
     panel_head(t, P_BEALLITAS, "BEALL");
     int yy = 42;
     char b[80];
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         const char *val = "";
         switch (i) {
             case 0: val = settings_wp_names(settings.wallpaper); break;
@@ -509,13 +509,19 @@ static void draw_panel_beallitas(texture_t *t, u32 tick) {
                 break;
             }
             case 4: val = settings.lang ? "EN" : "HU"; break;
-            case 5: val = settings.update_url; break;
+            case 5: val = settings.szep_mod ? (lang ? "ON" : "BE") : (lang ? "OFF" : "KI"); break;
+            case 6: val = settings.update_url; break;
         }
         ksnprintf(b, sizeof(b), "%s %s: %s", (set_sel == i) ? ">" : " ", SET_LABELS[lang][i], val);
         t_text(t, 12, yy, b, (set_sel == i) ? C_AMBER : C_TEXT);
         yy += 18;
     }
-    yy += 8;
+    yy += 6;
+    /* 0.5.1 videó-infó: aktuális mód + hol lehet nagyobbat választani */
+    ksnprintf(b, sizeof(b), lang ? "Video: %ux%u, %d-bit color" : "Videó: %ux%u, %d bites szín",
+              gfx_width(), gfx_height(), gfx_bpp());
+    t_text(t, 12, yy, b, C_MUTED); yy += 16;
+    t_text(t, 12, yy, lang ? "Bigger modes: GRUB menu at boot" : "Nagyobb módok: bootnál a GRUB menüben", C_MUTED); yy += 16;
     t_text(t, 12, yy, lang ? "F8 = save settings" : "F8 = beállítások mentése", C_MUTED); yy += 16;
     /* szín-előnézet */
     for (int i = 0; i < 6; i++) {
@@ -748,7 +754,7 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
     if (focus_panel == P_BEALLITAS) {
         if (sc == KEY_ESC) { view_target = 0; focus_panel = -1; return; }
         if (sc == KEY_UP)   { if (set_sel > 0) set_sel--; return; }
-        if (sc == KEY_DOWN) { if (set_sel < 5) set_sel++; return; }
+        if (sc == KEY_DOWN) { if (set_sel < 6) set_sel++; return; }
         if (sc == KEY_F8) { settings_save(); note_flash = tick_count(); return; }
         int delta = (sc == KEY_LEFT) ? -1 : (sc == KEY_RIGHT) ? 1 : 0;
         if (delta) {
@@ -777,6 +783,9 @@ void ui_handle_key(u8 sc, u8 rel, u8 ascii) {
                 case 4:
                     lang ^= 1;
                     settings.lang = lang;
+                    break;
+                case 5:
+                    settings.szep_mod = settings.szep_mod ? 0 : 1;
                     break;
             }
             return;

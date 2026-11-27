@@ -8,9 +8,9 @@ elliptical tracks; whatever you use often is pulled *inward*, whatever you
 ignore drifts *outward*. The desktop rearranges itself around your habits.
 
 ![Keringo OS](https://img.shields.io/badge/kernel-i386%20bare--metal-e8b24a)
-![Version](https://img.shields.io/badge/version-0.3.0-248bbe)
+![Version](https://img.shields.io/badge/version-0.5.1-248bbe)
 
-## What's inside (0.3.0 "Játéktér" / Playground)
+## What's inside (0.5.1 "MI és képernyők" / AI & screens)
 
 | Layer | Capability |
 |---|---|
@@ -18,15 +18,16 @@ ignore drifts *outward*. The desktop rearranges itself around your habits.
 | Devices | PS/2 keyboard + mouse, ATAPI CD, ATA HDD, **USB flash drives (UHCI/EHCI MSC, FAT32 read+write)**, PCI bus scan, **NICs: e1000 / RTL8139** |
 | Network | DHCP, TCP, UDP, DNS, HTTP — all in-kernel, no libc |
 | Filesystems | ISO9660 (`/cd`), RAMFS (`/mem`), FAT32 (`/sys` HDD, `/usb` stick), MBR + logical partition scanner |
-| Graphics | VBE linear framebuffer (any mode the BIOS gives, e.g. 1024×768 or 1280×800×32), double buffering, custom 8×8 font with hand-drawn Hungarian glyphs (ő ű), custom 3D projector, textured orbiting panels, **raycaster engine** |
-| Desktop | 10 orbiting panels: Core, Clock, Tasks, Notes, Files, About, Update, Browser, Settings, **Apps** — HU/EN (F1) |
+| Graphics | **Default boot is now truly 640×480×16** (the multiboot header's video fields moved to their spec-correct offset — GRUB used to ignore them and always boot EDID-auto 1280×800). GRUB menu: 640×480×8 (max compatibility, RGB332 palette programmed into the RAMDAC), ×16, ×32, 1024×768×32, auto. The UI renders into a 32bpp back buffer and converts to 8/16/24/32bpp output. **Smooth mode**: anti-aliased lines/circles, gradients, rounded corners, soft shadows. |
+| **KIRRDA AI (0.5.1)** | Local rule-based assistant: math ("12*34+7"), app launching ("inditsd a festot"), on-disk search ("keres: cfg"), **trainable** ("tanits: q = a", persisted in KIRRDA.TXT), and **internet**: plain-HTTP page fetching + real DNS resolution. Honest limits: no TLS/HTTPS, no JavaScript/HTML5. |
+| Desktop | 10 orbiting panels: Core, Clock, Tasks, Notes, Files, About, Update, Browser, Settings, **Apps** — HU/EN (F1). **0.5.1 Launcher (F5)**: full-screen app grid with categories, instant search, mouse support. |
 | Apps | **Paint**, **Text editor** (UTF-8, Hungarian accents), **Labyrinth 3D** (Wolfenstein homage), **Hellwalker** (Doom homage), **Star Hunter** (Elite homage), **City Builder** (SimCity homage), **Space Cadet Pinball** (Win95 homage), **Calculator**, **5 screensavers** |
 | Updates | `KERINGO.UPD` packages from USB stick or HTTP, install to `/sys`, **live update via kexec**, rollback |
 
 ## Quick start
 
 ```bash
-qemu-system-i386 -cdrom keringo-0.4.0.iso -boot d
+qemu-system-i386 -cdrom keringo-0.5.1.iso -boot d
 ```
 
 On real hardware: burn or Ventoy (legacy/CSM boot), or add to GRUB:
@@ -96,6 +97,15 @@ See [LICENSE](LICENSE). — Keringő OS is a hobby OS experiment; use it, break 
 extend it.
 
 ## Version history
+
+- **0.5.1** — KIRRDA AI 0.2 (math/launch/search/train/internet+DNS), Launcher,
+  true 640×480×16 default boot (multiboot header fix — GRUB previously
+  ignored our video request), 8bpp RGB332 mode, bpp-agnostic rendering,
+  Smooth mode (AA/gradients), DNS reply parsing fixes
+- **0.5.0** — Workshop: QUARTZ-4B, Partition manager, Installer, Commander,
+  Remote control (KRVP1); PS/2 AUX + TCP checksum fixes
+- **0.4.0** — Wi-Fi (AR9285, WPA2-PSK/CCMP), KIRRDA AI 0.1, Observatory,
+  Lab, Orbit Miner, ZX81 + QUARTZ foundations
 
 - **0.1.0** — orbiting desktop, kernel, CD reading, notes
 - **0.2.x** — USB FAT32, update packages, browser + live video, wallpapers,

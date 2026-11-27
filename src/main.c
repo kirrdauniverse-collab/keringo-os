@@ -93,6 +93,12 @@ void kmain(u32 magic, multiboot_info_t *mbi) {
         for (;;) hlt();
     }
     g_mbi_phys = (u32)mbi;
+    /* 0.5.1 FONTOS JAVÍTÁS: a multiboot-fejléc videó-mezői a SPEC szerint
+       a 32. offseten kezdődnek (az aout-kludge mezők után) — korábban a
+       12.-nél voltak, ezért a GRUB sosem látta őket, és EDID "auto"-val
+       (1280x800) bootolt minden. Most a GRUB ténylegesen beállítja a
+       fejlécben kért 640x480x16-ot; a menüpontok a multiboot UTÁN állított
+       gfxpayload-dal adnak más módot (8/32 bit, 1024x768, auto). */
     if (magic == 0x2BADB002 && (!(mbi->flags & MBI_FLAG_FRAMEBUFFER) ||
         mbi->framebuffer_width < 100 || mbi->framebuffer_bpp > 64)) {
         kprintf("FIGY: nincs hasznalhato framebuffer-info (flags=%x w=%d bpp=%d)\n",

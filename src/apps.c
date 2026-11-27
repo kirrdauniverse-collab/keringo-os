@@ -2,8 +2,11 @@
  * regiszter, indítás/kilépés, bemenet-útvonal, közös rajzsegédek */
 #include "kernel.h"
 
-/* ---------- alkalmazás-jegyzék ---------- */
+/* ---------- alkalmazás-jegyzék ----------
+ * 0.5.1: Indítópanel a lista élén (mindig látható, teljes képernyős,
+ * kategóriákkal és azonnali kereséssel) */
 const app_t app_list[] = {
+    { {"Indítópanel",           "Launcher"},       launcher_enter, launcher_frame, launcher_key, launcher_mouse, launcher_exit, launcher_esc },
     { {"Festő",               "Paint"},          paint_enter,  paint_frame,  paint_key,  paint_mouse,  paint_exit, 0 },
     { {"Szövegszerkesztő",    "Text editor"},    text_enter,   text_frame,   text_key,   0,            text_exit,  0 },
     { {"Labirintus 3D",       "Labyrinth 3D"},   ray_enter_lab,  ray_frame,   ray_key,   0,            ray_exit,   0 },
@@ -29,11 +32,38 @@ const app_t app_list[] = {
 };
 const int APP_COUNT = sizeof(app_list) / sizeof(app_list[0]);
 
+/* 0.5.1 kategóriák az Indítópanelhoz (app_list-tel párhuzamos):
+ * 1=játék 2=műhely/eszköz 3=rendszer/MI 4=retro 5=hálózat */
+const u8 app_cat[] = {
+    3,   /* Indítópanel */
+    2,   /* Festő */
+    2,   /* Szövegszerkesztő */
+    1,   /* Labirintus 3D */
+    1,   /* Pokoljáró */
+    1,   /* Csillagvadász */
+    1,   /* Városépítő */
+    1,   /* Űrkadét Flipper */
+    3,   /* Képernyővédők */
+    2,   /* Számológép */
+    5,   /* Wi-Fi */
+    4,   /* Keringő BASIC */
+    3,   /* KIRRDA AI */
+    2,   /* Obszervatórium */
+    2,   /* Keringő Lab */
+    1,   /* Orbit Miner */
+    4,   /* ZX81 Retro */
+    4,   /* QUARTZ-4B */
+    3,   /* Partíciókezelő */
+    3,   /* Telepítő */
+    2,   /* Commander */
+    5,   /* Távvezérlő */
+};
+
 /* gyorsindító billentyűk (galaxis nézetben) — a panelek saját F-gombjait
  * (Lemez F5, Beállítás F8) nem írjuk felül: az új appok a Programok panelről
- * indíthatók (görgethető lista) */
-const int app_hotkey_app[] = { 0, 1, 2, 3, 4, 5, 6, 9 };
-const u8  app_hotkey_key[] = { KEY_F3, KEY_F4, KEY_F7, KEY_F9, KEY_F10, KEY_F11, KEY_F12, KEY_F6 };
+ * indíthatók (görgethető lista). 0.5.1: F5 = Indítópanel a galaxisban. */
+const int app_hotkey_app[] = { 0, 1, 2, 3, 4, 5, 6, 7, 10 };
+const u8  app_hotkey_key[] = { KEY_F5, KEY_F3, KEY_F4, KEY_F7, KEY_F9, KEY_F10, KEY_F11, KEY_F12, KEY_F6 };
 const int APP_HOTKEYS = sizeof(app_hotkey_key);
 
 static int cur = -1;                 /* aktív alkalmazás sorszáma */
@@ -103,13 +133,21 @@ void app_frame(u32 tick) {
 /* ---------- közös rajzsegédek ---------- */
 void app_chrome(const char *title, const char *status, u32 accent) {
     int W = (int)gfx_width(), H = (int)gfx_height();
-    gfx_fill_rect(0, 0, W, 22, 0xE6151B22);
-    gfx_fill_rect(0, 22, W, 1, accent);
+    if (settings.szep_mod) {
+        /* 0.5.1 szép mód: gradiens fejléc + vastagabb kiemelővonal */
+        gfx_gradient_rect(0, 0, W, 22, gfx_lerp_color(accent, 0xFF151B22, 110), 0xE6151B22);
+        gfx_fill_rect(0, 22, W, 2, accent);
+        gfx_gradient_rect(0, H - 20, W, 20, 0xE61C2530, 0xE6151B22);
+        gfx_fill_rect(0, H - 22, W, 2, gfx_lerp_color(accent, 0xFF10151A, 60));
+    } else {
+        gfx_fill_rect(0, 0, W, 22, 0xE6151B22);
+        gfx_fill_rect(0, 22, W, 1, accent);
+        gfx_fill_rect(0, H - 20, W, 20, 0xE6151B22);
+        gfx_fill_rect(0, H - 21, W, 1, accent);
+    }
     gfx_draw_text(8, 7, title, accent, 0xFF000000u);
     const char *esc = ui_lang() ? "Esc: back to desktop" : "Esc: vissza az asztalra";
     gfx_draw_text(W - gfx_text_width(esc) - 8, 7, esc, 0xFF8FA0AC, 0xFF000000u);
-    gfx_fill_rect(0, H - 20, W, 20, 0xE6151B22);
-    gfx_fill_rect(0, H - 21, W, 1, accent);
     gfx_draw_text(8, H - 15, status, 0xFF8FA0AC, 0xFF000000u);
 }
 
@@ -156,10 +194,17 @@ int app_in_rect(int x, int y, int rx, int ry, int rw, int rh) {
 }
 
 void app_button(int x, int y, int w, int h, const char *label, u32 accent, int pressed) {
-    u32 bg   = pressed ? accent : 0xFF24313C;
-    u32 bcol = pressed ? 0xFFF0F0F0 : accent;
-    gfx_fill_rect(x, y, w, h, bg);
-    gfx_rect(x, y, w, h, bcol);
+    if (settings.szep_mod && !pressed) {
+        /* 0.5.1 szép mód: lekerekített, enyhén gradiens gomb */
+        gfx_rounded_fill(x, y, w, h, 4, 0xFF24313C);
+        gfx_gradient_rect(x + 5, y + 1, w - 10, h - 3, 0xFF313E4A, 0xFF22303B);
+        gfx_aa_line(x + 5, y + 1, x + w - 6, y + 1, accent);
+        gfx_aa_line(x + 5, y + h - 2, x + w - 6, y + h - 2, gfx_lerp_color(accent, 0xFF24313C, 120));
+    } else {
+        u32 bg   = pressed ? accent : 0xFF24313C;
+        gfx_fill_rect(x, y, w, h, bg);
+        gfx_rect(x, y, w, h, pressed ? 0xFFF0F0F0 : accent);
+    }
     if (label) {
         int lw = gfx_text_width(label);
         gfx_draw_text(x + (w - lw) / 2, y + (h - 8) / 2, label,
